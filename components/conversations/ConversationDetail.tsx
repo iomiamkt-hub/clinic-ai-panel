@@ -88,13 +88,13 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   }
 
   async function handleToggleAI() {
-    if (!conversation) return;
+    console.log("handleToggleAI chamado, conversationId:", conversationId, "aiEnabled:", aiEnabled);
     const newValue = !aiEnabled;
     setAiEnabled(newValue);
     setAiToggling(true);
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/conversations/${conversation.id}/ai`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/conversations/${conversationId}/ai`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
