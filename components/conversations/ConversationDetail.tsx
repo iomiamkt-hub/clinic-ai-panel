@@ -149,13 +149,15 @@ export function ConversationDetail({ conversationId, onClose, onStatusChanged }:
           <Textarea
             value={reply}
             onChange={(e) => setReply(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            autoComplete="off"
             placeholder="Digite uma resposta como secretaria..."
             rows={2}
-            disabled={!conversation}
           />
           <Button
             onClick={handleSendReply}
-            disabled={sending || !reply.trim() || !conversation}
+            disabled={sending || !reply.trim()}
             className="self-end"
           >
             <Send className="h-4 w-4" />
