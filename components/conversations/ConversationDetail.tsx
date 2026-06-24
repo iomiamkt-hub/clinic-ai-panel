@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { conversationsApi, getApiErrorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { formatPhone } from "@/lib/conversation";
 import type { Conversation, Message } from "@/types";
 
 function formatDate(value?: string) {
@@ -31,6 +32,7 @@ export function ConversationDetail({ conversationId, onClose, onStatusChanged }:
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -48,11 +50,15 @@ export function ConversationDetail({ conversationId, onClose, onStatusChanged }:
     if (!conversation) return;
     setUpdating(true);
     setError("");
+    setSuccess("");
     try {
       await conversationsApi.updateStatus(conversation.id, status);
       const updated = { ...conversation, status };
       setConversation(updated);
       onStatusChanged(updated);
+      setSuccess(
+        status === "WAITING_HUMAN" ? "Atendimento assumido com sucesso" : "IA reativada com sucesso",
+      );
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
@@ -66,9 +72,9 @@ export function ConversationDetail({ conversationId, onClose, onStatusChanged }:
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div>
             <h2 className="text-base font-semibold text-primary">
-              {conversation?.patientName ?? (loading ? "Carregando..." : "Paciente")}
+              {conversation?.patient?.name ?? (loading ? "Carregando..." : "Paciente sem nome")}
             </h2>
-            <p className="text-xs text-muted-foreground">{conversation?.phone ?? "Sem telefone"}</p>
+            <p className="text-xs text-muted-foreground">{formatPhone(conversation?.patient?.phone)}</p>
           </div>
           <button onClick={onClose} className="rounded-md p-1.5 hover:bg-muted">
             <X className="h-5 w-5" />
@@ -76,6 +82,7 @@ export function ConversationDetail({ conversationId, onClose, onStatusChanged }:
         </div>
 
         {error && <div className="bg-danger/10 px-5 py-2 text-sm text-danger">{error}</div>}
+        {success && <div className="bg-success/10 px-5 py-2 text-sm text-success">{success}</div>}
 
         <div className="flex-1 overflow-y-auto bg-muted/30 px-5 py-4 scrollbar-thin">
           {loading ? (

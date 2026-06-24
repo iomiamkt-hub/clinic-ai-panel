@@ -1,10 +1,23 @@
 export type ConversationStatus = "ACTIVE" | "WAITING_HUMAN" | "COMPLETED";
 
+export type ConversationStage =
+  | "GREETING"
+  | "COLLECTING_INFO"
+  | "CHECKING_AVAILABILITY"
+  | "CONFIRMING"
+  | "COMPLETED"
+  | "ESCALATED"
+  | string;
+
+export interface Patient {
+  name?: string | null;
+  phone?: string | null;
+}
+
 export interface Conversation {
   id: string;
-  patientName: string;
-  phone: string;
-  stage: string;
+  patient?: Patient | null;
+  stage?: ConversationStage | null;
   status: ConversationStatus;
   updatedAt: string;
   createdAt: string;

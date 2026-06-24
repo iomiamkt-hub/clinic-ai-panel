@@ -1,6 +1,7 @@
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
+import { formatPhone, translateStage } from "@/lib/conversation";
 import type { Conversation } from "@/types";
 
 const statusConfig: Record<Conversation["status"], { label: string; variant: "success" | "warning" | "default" }> = {
@@ -32,9 +33,11 @@ export function ConversationCard({ conversation, onClick }: ConversationCardProp
       className="flex w-full items-center justify-between rounded-lg border border-border bg-white px-4 py-3 text-left transition-colors hover:bg-muted/50"
     >
       <div className="flex flex-col gap-0.5">
-        <span className="text-sm font-medium text-primary">{conversation?.patientName ?? "Paciente"}</span>
-        <span className="text-xs text-muted-foreground">{conversation?.phone ?? "Sem telefone"}</span>
-        <span className="text-xs text-muted-foreground">Etapa: {conversation?.stage ?? "-"}</span>
+        <span className="text-sm font-medium text-primary">
+          {conversation?.patient?.name ?? "Paciente sem nome"}
+        </span>
+        <span className="text-xs text-muted-foreground">{formatPhone(conversation?.patient?.phone)}</span>
+        <span className="text-xs text-muted-foreground">Etapa: {translateStage(conversation?.stage)}</span>
       </div>
       <div className="flex flex-col items-end gap-1.5">
         <Badge variant={status.variant}>{status.label}</Badge>
