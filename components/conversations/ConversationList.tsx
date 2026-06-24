@@ -30,10 +30,6 @@ export function ConversationList() {
     [conversations, statusFilter],
   );
 
-  function handleStatusChanged(updated: Conversation) {
-    setConversations((prev) => prev.map((c) => (c?.id === updated?.id ? updated : c)));
-  }
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
@@ -64,11 +60,7 @@ export function ConversationList() {
       </div>
 
       {selectedId && (
-        <ConversationDetail
-          conversationId={selectedId}
-          onClose={() => setSelectedId(null)}
-          onStatusChanged={handleStatusChanged}
-        />
+        <ConversationDetail conversationId={selectedId} onClose={() => setSelectedId(null)} />
       )}
     </div>
   );

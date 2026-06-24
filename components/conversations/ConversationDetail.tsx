@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { X, UserCheck, Bot, Send } from "lucide-react";
+import { X, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,16 +30,13 @@ const senderConfig: Record<Message["sender"], { label: string | null; bubble: st
 interface ConversationDetailProps {
   conversationId: string;
   onClose: () => void;
-  onStatusChanged: (conversation: Conversation) => void;
 }
 
-export function ConversationDetail({ conversationId, onClose, onStatusChanged }: ConversationDetailProps) {
+export function ConversationDetail({ conversationId, onClose }: ConversationDetailProps) {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [replyError, setReplyError] = useState("");
@@ -55,26 +52,6 @@ export function ConversationDetail({ conversationId, onClose, onStatusChanged }:
       .catch((err) => setError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
   }, [conversationId]);
-
-  async function handleStatusChange(status: Conversation["status"]) {
-    if (!conversation) return;
-    setUpdating(true);
-    setError("");
-    setSuccess("");
-    try {
-      await conversationsApi.updateStatus(conversation.id, status);
-      const updated = { ...conversation, status };
-      setConversation(updated);
-      onStatusChanged(updated);
-      setSuccess(
-        status === "WAITING_HUMAN" ? "Atendimento assumido com sucesso" : "IA reativada com sucesso",
-      );
-    } catch (err) {
-      setError(getApiErrorMessage(err));
-    } finally {
-      setUpdating(false);
-    }
-  }
 
   async function handleSendReply() {
     if (!reply.trim()) return;
@@ -117,7 +94,6 @@ export function ConversationDetail({ conversationId, onClose, onStatusChanged }:
         </div>
 
         {error && <div className="bg-danger/10 px-5 py-2 text-sm text-danger">{error}</div>}
-        {success && <div className="bg-success/10 px-5 py-2 text-sm text-success">{success}</div>}
 
         <div className="flex-1 overflow-y-auto bg-muted/30 px-5 py-4 scrollbar-thin">
           {loading ? (
@@ -163,30 +139,6 @@ export function ConversationDetail({ conversationId, onClose, onStatusChanged }:
             <Send className="h-4 w-4" />
             {sending ? "Enviando..." : "Enviar"}
           </Button>
-        </div>
-
-        <div className="flex items-center gap-2 border-t border-border px-5 py-4">
-          {conversation?.status !== "WAITING_HUMAN" ? (
-            <Button
-              variant="secondary"
-              className="flex-1"
-              disabled={updating || !conversation}
-              onClick={() => handleStatusChange("WAITING_HUMAN")}
-            >
-              <UserCheck className="h-4 w-4" />
-              Assumir atendimento
-            </Button>
-          ) : (
-            <Button className="flex-1" disabled={updating || !conversation} onClick={() => handleStatusChange("ACTIVE")}>
-              <Bot className="h-4 w-4" />
-              Reativar IA
-            </Button>
-          )}
-          {conversation && (
-            <Badge variant={conversation.status === "ACTIVE" ? "success" : conversation.status === "WAITING_HUMAN" ? "warning" : "default"}>
-              {conversation.status}
-            </Badge>
-          )}
         </div>
       </div>
     </div>
