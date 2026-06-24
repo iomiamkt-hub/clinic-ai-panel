@@ -37,7 +37,10 @@ export function ConversationCard({ conversation, onClick }: ConversationCardProp
         <span className="text-sm font-medium text-primary">
           {conversation?.patient?.name ?? "Paciente sem nome"}
         </span>
-        <Badge variant={status.variant}>{status.label}</Badge>
+        <div className="flex items-center gap-1.5">
+          {conversation?.aiEnabled === false && <Badge variant="danger">IA pausada</Badge>}
+          <Badge variant={status.variant}>{status.label}</Badge>
+        </div>
       </div>
 
       <span className="text-xs text-muted-foreground">{formatPhone(conversation?.patient?.phone)}</span>

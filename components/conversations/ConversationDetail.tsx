@@ -40,6 +40,8 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [replyError, setReplyError] = useState("");
+  const [aiToggling, setAiToggling] = useState(false);
+  const [toast, setToast] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -75,11 +77,32 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     }
   }
 
+  function showToast(message: string) {
+    setToast(message);
+    setTimeout(() => setToast(""), 3000);
+  }
+
+  async function handleToggleAi() {
+    if (!conversation) return;
+    const nextValue = !(conversation.aiEnabled ?? true);
+    setAiToggling(true);
+    try {
+      await conversationsApi.setAiEnabled(conversationId, nextValue);
+      setConversation((prev) => (prev ? { ...prev, aiEnabled: nextValue } : prev));
+      showToast(nextValue ? "IA ativada com sucesso" : "IA pausada com sucesso");
+    } catch (err) {
+      showToast(getApiErrorMessage(err));
+    } finally {
+      setAiToggling(false);
+    }
+  }
+
   const funnel = getFunnelBadge(conversation);
+  const aiEnabled = conversation?.aiEnabled ?? true;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/30">
-      <div className="flex h-full w-full max-w-lg flex-col bg-white shadow-xl">
+      <div className="relative flex h-full w-full max-w-lg flex-col bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex flex-col gap-1">
             <h2 className="text-base font-semibold text-primary">
@@ -92,6 +115,32 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {conversation && (
+          <div className="flex items-center justify-between border-b border-border px-5 py-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleToggleAi}
+                disabled={aiToggling}
+                className={cn(
+                  "relative h-6 w-11 rounded-full transition-colors disabled:opacity-60",
+                  aiEnabled ? "bg-success" : "bg-danger",
+                )}
+              >
+                <span
+                  className={cn(
+                    "absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform",
+                    aiEnabled ? "translate-x-[22px]" : "translate-x-0.5",
+                  )}
+                />
+              </button>
+              <span className={cn("text-sm font-medium", aiEnabled ? "text-success" : "text-danger")}>
+                {aiEnabled ? "IA ativa" : "IA pausada"}
+              </span>
+            </div>
+            {!aiEnabled && <Badge variant="danger">IA pausada</Badge>}
+          </div>
+        )}
 
         {error && <div className="bg-danger/10 px-5 py-2 text-sm text-danger">{error}</div>}
 
@@ -140,6 +189,12 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             {sending ? "Enviando..." : "Enviar"}
           </Button>
         </div>
+
+        {toast && (
+          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-md bg-primary px-4 py-2 text-xs font-medium text-white shadow-lg">
+            {toast}
+          </div>
+        )}
       </div>
     </div>
   );

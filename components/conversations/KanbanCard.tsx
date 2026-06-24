@@ -24,9 +24,16 @@ export function KanbanCard({ conversation, onClick }: KanbanCardProps) {
         borderClass,
       )}
     >
-      <span className="text-sm font-medium text-primary">
-        {conversation?.patient?.name ?? formatPhone(conversation?.patient?.phone)}
-      </span>
+      <div className="flex items-start justify-between gap-1">
+        <span className="text-sm font-medium text-primary">
+          {conversation?.patient?.name ?? formatPhone(conversation?.patient?.phone)}
+        </span>
+        {conversation?.aiEnabled === false && (
+          <span className="shrink-0 rounded-full bg-danger/10 px-1.5 py-0.5 text-[9px] font-semibold text-danger">
+            IA pausada
+          </span>
+        )}
+      </div>
 
       {conversation?.lastMessage?.content && (
         <span className="text-xs text-muted-foreground">

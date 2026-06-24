@@ -28,6 +28,7 @@ export interface Conversation {
   lastMessage?: LastMessage | null;
   updatedAt: string;
   createdAt: string;
+  aiEnabled?: boolean;
 }
 
 export interface Message {

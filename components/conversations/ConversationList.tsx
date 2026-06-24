@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types";
 
 type ViewMode = "list" | "kanban";
+type StageFilter = FunnelKey | "ALL" | "AI_PAUSED";
 
 const VIEW_MODE_KEY = "conversas-view-mode";
 
@@ -19,7 +20,7 @@ export function ConversationList() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [stageFilter, setStageFilter] = useState<FunnelKey | "ALL">("ALL");
+  const [stageFilter, setStageFilter] = useState<StageFilter>("ALL");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
@@ -60,11 +61,11 @@ export function ConversationList() {
     return map;
   }, [conversations]);
 
-  const filtered = useMemo(
-    () =>
-      stageFilter === "ALL" ? conversations : conversations.filter((c) => getFunnelKey(c) === stageFilter),
-    [conversations, stageFilter],
-  );
+  const filtered = useMemo(() => {
+    if (stageFilter === "ALL") return conversations;
+    if (stageFilter === "AI_PAUSED") return conversations.filter((c) => c?.aiEnabled === false);
+    return conversations.filter((c) => getFunnelKey(c) === stageFilter);
+  }, [conversations, stageFilter]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -114,7 +115,7 @@ export function ConversationList() {
       <div className="flex items-center gap-3">
         <Select
           value={stageFilter}
-          onChange={(e) => setStageFilter(e.target.value as FunnelKey | "ALL")}
+          onChange={(e) => setStageFilter(e.target.value as StageFilter)}
           className="w-56"
         >
           <option value="ALL">Todos</option>
@@ -123,6 +124,7 @@ export function ConversationList() {
               {stage.label}
             </option>
           ))}
+          <option value="AI_PAUSED">IA pausada</option>
         </Select>
       </div>
 
