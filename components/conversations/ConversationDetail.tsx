@@ -109,6 +109,51 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/30">
       <div className="relative flex h-full w-full max-w-lg flex-col bg-white shadow-xl">
+        <div
+          data-testid="ai-toggle"
+          style={{
+            padding: "8px 16px",
+            borderBottom: "1px solid #e5e7eb",
+            background: "#f9fafb",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <span style={{ fontSize: "14px", fontWeight: 500 }}>
+            {aiEnabled ? "🟢 IA ativa" : "🔴 IA pausada"}
+          </span>
+          <button
+            onClick={handleToggleAi}
+            disabled={aiToggling}
+            style={{
+              position: "relative",
+              display: "inline-flex",
+              height: "24px",
+              width: "44px",
+              alignItems: "center",
+              borderRadius: "9999px",
+              border: "none",
+              cursor: "pointer",
+              backgroundColor: aiEnabled ? "#22c55e" : "#ef4444",
+              transition: "background-color 0.2s",
+              opacity: aiToggling ? 0.6 : 1,
+            }}
+          >
+            <span
+              style={{
+                display: "inline-block",
+                height: "16px",
+                width: "16px",
+                borderRadius: "9999px",
+                backgroundColor: "white",
+                transform: aiEnabled ? "translateX(24px)" : "translateX(4px)",
+                transition: "transform 0.2s",
+              }}
+            />
+          </button>
+        </div>
+
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex flex-col gap-1">
             <h2 className="text-base font-semibold text-primary">
@@ -121,29 +166,6 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             <X className="h-5 w-5" />
           </button>
         </div>
-
-        {conversation && (
-          <div className="flex items-center justify-between border-b border-border p-3">
-            <span className="text-sm font-medium">
-              {aiEnabled ? "🟢 IA ativa" : "🔴 IA pausada"}
-            </span>
-            <button
-              onClick={handleToggleAi}
-              disabled={aiToggling}
-              className={cn(
-                "relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-60",
-                aiEnabled ? "bg-green-500" : "bg-red-500",
-              )}
-            >
-              <span
-                className={cn(
-                  "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                  aiEnabled ? "translate-x-6" : "translate-x-1",
-                )}
-              />
-            </button>
-          </div>
-        )}
 
         {error && <div className="bg-danger/10 px-5 py-2 text-sm text-danger">{error}</div>}
 
