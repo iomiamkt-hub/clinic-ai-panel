@@ -117,28 +117,25 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
         </div>
 
         {conversation && (
-          <div className="flex items-center justify-between border-b border-border px-5 py-3">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleToggleAi}
-                disabled={aiToggling}
+          <div className="flex items-center justify-between border-b border-border p-3">
+            <span className="text-sm font-medium">
+              {aiEnabled ? "🟢 IA ativa" : "🔴 IA pausada"}
+            </span>
+            <button
+              onClick={handleToggleAi}
+              disabled={aiToggling}
+              className={cn(
+                "relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-60",
+                aiEnabled ? "bg-green-500" : "bg-red-500",
+              )}
+            >
+              <span
                 className={cn(
-                  "relative h-6 w-11 rounded-full transition-colors disabled:opacity-60",
-                  aiEnabled ? "bg-success" : "bg-danger",
+                  "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                  aiEnabled ? "translate-x-6" : "translate-x-1",
                 )}
-              >
-                <span
-                  className={cn(
-                    "absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform",
-                    aiEnabled ? "translate-x-[22px]" : "translate-x-0.5",
-                  )}
-                />
-              </button>
-              <span className={cn("text-sm font-medium", aiEnabled ? "text-success" : "text-danger")}>
-                {aiEnabled ? "IA ativa" : "IA pausada"}
-              </span>
-            </div>
-            {!aiEnabled && <Badge variant="danger">IA pausada</Badge>}
+              />
+            </button>
           </div>
         )}
 
