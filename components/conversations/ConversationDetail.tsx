@@ -42,6 +42,11 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   const [replyError, setReplyError] = useState("");
   const [aiToggling, setAiToggling] = useState(false);
   const [toast, setToast] = useState("");
+  const [aiEnabled, setAiEnabled] = useState<boolean>(true);
+
+  useEffect(() => {
+    setAiEnabled(conversation?.aiEnabled ?? true);
+  }, [conversation?.aiEnabled]);
 
   useEffect(() => {
     setLoading(true);
@@ -84,13 +89,15 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
   async function handleToggleAi() {
     if (!conversation) return;
-    const nextValue = !(conversation.aiEnabled ?? true);
+    const nextValue = !aiEnabled;
+    setAiEnabled(nextValue);
     setAiToggling(true);
     try {
       await conversationsApi.setAiEnabled(conversationId, nextValue);
       setConversation((prev) => (prev ? { ...prev, aiEnabled: nextValue } : prev));
       showToast(nextValue ? "IA ativada com sucesso" : "IA pausada com sucesso");
     } catch (err) {
+      setAiEnabled(!nextValue);
       showToast(getApiErrorMessage(err));
     } finally {
       setAiToggling(false);
@@ -98,7 +105,6 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   }
 
   const funnel = getFunnelBadge(conversation);
-  const aiEnabled = conversation?.aiEnabled ?? true;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/30">
