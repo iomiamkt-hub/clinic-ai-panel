@@ -87,18 +87,30 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     setTimeout(() => setToast(""), 3000);
   }
 
-  async function handleToggleAi() {
+  async function handleToggleAI() {
     if (!conversation) return;
-    const nextValue = !aiEnabled;
-    setAiEnabled(nextValue);
+    const newValue = !aiEnabled;
+    setAiEnabled(newValue);
     setAiToggling(true);
     try {
-      await conversationsApi.setAiEnabled(conversationId, nextValue);
-      setConversation((prev) => (prev ? { ...prev, aiEnabled: nextValue } : prev));
-      showToast(nextValue ? "IA ativada com sucesso" : "IA pausada com sucesso");
-    } catch (err) {
-      setAiEnabled(!nextValue);
-      showToast(getApiErrorMessage(err));
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/conversations/${conversation.id}/ai`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ aiEnabled: newValue }),
+        },
+      );
+      if (!response.ok) {
+        setAiEnabled(!newValue);
+        showToast("Nao foi possivel atualizar a IA. Tente novamente.");
+      } else {
+        setConversation((prev) => (prev ? { ...prev, aiEnabled: newValue } : prev));
+        showToast(newValue ? "IA ativada com sucesso" : "IA pausada com sucesso");
+      }
+    } catch {
+      setAiEnabled(!newValue);
+      showToast("Nao foi possivel atualizar a IA. Tente novamente.");
     } finally {
       setAiToggling(false);
     }
@@ -124,7 +136,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             {aiEnabled ? "🟢 IA ativa" : "🔴 IA pausada"}
           </span>
           <button
-            onClick={handleToggleAi}
+            onClick={handleToggleAI}
             disabled={aiToggling}
             style={{
               position: "relative",
