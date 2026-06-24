@@ -1,7 +1,7 @@
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { formatPhone, translateStage } from "@/lib/conversation";
+import { formatPhone, getFunnelBadge } from "@/lib/conversation";
 import type { Conversation } from "@/types";
 
 const statusConfig: Record<Conversation["status"], { label: string; variant: "success" | "warning" | "default" }> = {
@@ -26,18 +26,19 @@ interface ConversationCardProps {
 
 export function ConversationCard({ conversation, onClick }: ConversationCardProps) {
   const status = statusConfig[conversation?.status] ?? statusConfig.COMPLETED;
+  const funnel = getFunnelBadge(conversation);
 
   return (
     <button
       onClick={onClick}
       className="flex w-full items-center justify-between rounded-lg border border-border bg-white px-4 py-3 text-left transition-colors hover:bg-muted/50"
     >
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-1">
         <span className="text-sm font-medium text-primary">
           {conversation?.patient?.name ?? "Paciente sem nome"}
         </span>
         <span className="text-xs text-muted-foreground">{formatPhone(conversation?.patient?.phone)}</span>
-        <span className="text-xs text-muted-foreground">Etapa: {translateStage(conversation?.stage)}</span>
+        <Badge className={funnel.className}>{funnel.label}</Badge>
       </div>
       <div className="flex flex-col items-end gap-1.5">
         <Badge variant={status.variant}>{status.label}</Badge>

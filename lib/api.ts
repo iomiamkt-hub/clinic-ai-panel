@@ -37,6 +37,8 @@ export const conversationsApi = {
     ),
   updateStatus: (id: string, status: Conversation["status"]) =>
     api.patch(`/api/conversations/${id}/status`, { status }).then((r) => r.data),
+  reply: (id: string, message: string) =>
+    api.post<Message>(`/api/conversations/${id}/reply`, { message }).then((r) => r.data),
 };
 
 export const appointmentsApi = {

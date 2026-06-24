@@ -1,17 +1,33 @@
-import type { ConversationStage } from "@/types";
+import type { Conversation, ConversationStage } from "@/types";
 
-export const stageLabels: Record<string, string> = {
-  GREETING: "Saudacao inicial",
-  COLLECTING_INFO: "Coletando informacoes",
-  CHECKING_AVAILABILITY: "Verificando agenda",
-  CONFIRMING: "Confirmando agendamento",
-  COMPLETED: "Concluido",
-  ESCALATED: "Escalado para humano",
+interface FunnelBadgeConfig {
+  label: string;
+  className: string;
+}
+
+const stageBadgeConfig: Record<string, FunnelBadgeConfig> = {
+  GREETING: { label: "Lead novo", className: "bg-sky-100 text-sky-700" },
+  COLLECTING_INFO: { label: "Em atendimento", className: "bg-yellow-100 text-yellow-700" },
+  CHECKING_AVAILABILITY: { label: "Verificando agenda", className: "bg-orange-100 text-orange-600" },
+  CONFIRMING: { label: "Confirmando", className: "bg-secondary/15 text-secondary" },
+  COMPLETED: { label: "Agendado", className: "bg-success/15 text-success" },
+  ESCALATED: { label: "Aguardando secretaria", className: "bg-danger/15 text-danger" },
 };
+
+const waitingHumanBadge: FunnelBadgeConfig = { label: "Com secretaria", className: "bg-purple-100 text-purple-700" };
+
+const defaultBadge: FunnelBadgeConfig = { label: "Nao informado", className: "bg-muted text-muted-foreground" };
+
+export function getFunnelBadge(conversation?: Pick<Conversation, "status" | "stage"> | null): FunnelBadgeConfig {
+  if (!conversation) return defaultBadge;
+  if (conversation.status === "WAITING_HUMAN") return waitingHumanBadge;
+  if (!conversation.stage) return defaultBadge;
+  return stageBadgeConfig[conversation.stage] ?? { label: conversation.stage, className: defaultBadge.className };
+}
 
 export function translateStage(stage?: ConversationStage | null): string {
   if (!stage) return "Nao informado";
-  return stageLabels[stage] ?? stage;
+  return stageBadgeConfig[stage]?.label ?? stage;
 }
 
 export function formatPhone(phone?: string | null): string {
