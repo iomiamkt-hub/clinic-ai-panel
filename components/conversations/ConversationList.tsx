@@ -5,13 +5,15 @@ import { ConversationCard } from "@/components/conversations/ConversationCard";
 import { ConversationDetail } from "@/components/conversations/ConversationDetail";
 import { Select } from "@/components/ui/select";
 import { conversationsApi, getApiErrorMessage } from "@/lib/api";
-import type { Conversation, ConversationStatus } from "@/types";
+import { FUNNEL_STAGES, getFunnelKey, type FunnelKey } from "@/lib/conversation";
+import { cn } from "@/lib/utils";
+import type { Conversation } from "@/types";
 
 export function ConversationList() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ConversationStatus | "ALL">("ALL");
+  const [stageFilter, setStageFilter] = useState<FunnelKey | "ALL">("ALL");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -22,26 +24,51 @@ export function ConversationList() {
       .finally(() => setLoading(false));
   }, []);
 
+  const counts = useMemo(() => {
+    const map = new Map<FunnelKey, number>(FUNNEL_STAGES.map((s) => [s.key, 0]));
+    for (const c of conversations) {
+      const key = getFunnelKey(c);
+      if (key) map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return map;
+  }, [conversations]);
+
   const filtered = useMemo(
     () =>
-      statusFilter === "ALL"
-        ? conversations
-        : conversations.filter((c) => c?.status === statusFilter),
-    [conversations, statusFilter],
+      stageFilter === "ALL" ? conversations : conversations.filter((c) => getFunnelKey(c) === stageFilter),
+    [conversations, stageFilter],
   );
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {FUNNEL_STAGES.map((stage) => (
+          <button
+            key={stage.key}
+            onClick={() => setStageFilter((prev) => (prev === stage.key ? "ALL" : stage.key))}
+            className={cn(
+              "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+              stage.className,
+              stageFilter === stage.key && "ring-2 ring-offset-1 ring-primary",
+            )}
+          >
+            {stage.label}: {counts.get(stage.key) ?? 0}
+          </button>
+        ))}
+      </div>
+
       <div className="flex items-center gap-3">
         <Select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as ConversationStatus | "ALL")}
+          value={stageFilter}
+          onChange={(e) => setStageFilter(e.target.value as FunnelKey | "ALL")}
           className="w-56"
         >
-          <option value="ALL">Todos os status</option>
-          <option value="ACTIVE">Ativa</option>
-          <option value="WAITING_HUMAN">Aguardando humano</option>
-          <option value="COMPLETED">Concluida</option>
+          <option value="ALL">Todos</option>
+          {FUNNEL_STAGES.map((stage) => (
+            <option key={stage.key} value={stage.key}>
+              {stage.label}
+            </option>
+          ))}
         </Select>
       </div>
 

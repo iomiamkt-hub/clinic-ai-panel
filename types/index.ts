@@ -14,11 +14,18 @@ export interface Patient {
   phone?: string | null;
 }
 
+export interface LastMessage {
+  content?: string | null;
+  sender?: "PATIENT" | "LORENA" | "HUMAN";
+  createdAt?: string;
+}
+
 export interface Conversation {
   id: string;
   patient?: Patient | null;
   stage?: ConversationStage | null;
   status: ConversationStatus;
+  lastMessage?: LastMessage | null;
   updatedAt: string;
   createdAt: string;
 }

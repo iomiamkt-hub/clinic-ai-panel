@@ -18,6 +18,30 @@ const waitingHumanBadge: FunnelBadgeConfig = { label: "Com secretaria", classNam
 
 const defaultBadge: FunnelBadgeConfig = { label: "Nao informado", className: "bg-muted text-muted-foreground" };
 
+export type FunnelKey =
+  | "GREETING"
+  | "COLLECTING_INFO"
+  | "CHECKING_AVAILABILITY"
+  | "CONFIRMING"
+  | "COMPLETED"
+  | "WAITING_HUMAN";
+
+export const FUNNEL_STAGES: { key: FunnelKey; label: string; className: string }[] = [
+  { key: "GREETING", ...stageBadgeConfig.GREETING },
+  { key: "COLLECTING_INFO", ...stageBadgeConfig.COLLECTING_INFO },
+  { key: "CHECKING_AVAILABILITY", ...stageBadgeConfig.CHECKING_AVAILABILITY },
+  { key: "CONFIRMING", ...stageBadgeConfig.CONFIRMING },
+  { key: "COMPLETED", ...stageBadgeConfig.COMPLETED },
+  { key: "WAITING_HUMAN", ...waitingHumanBadge },
+];
+
+export function getFunnelKey(conversation?: Pick<Conversation, "status" | "stage"> | null): FunnelKey | null {
+  if (!conversation) return null;
+  if (conversation.status === "WAITING_HUMAN") return "WAITING_HUMAN";
+  if (!conversation.stage) return null;
+  return FUNNEL_STAGES.some((s) => s.key === conversation.stage) ? (conversation.stage as FunnelKey) : null;
+}
+
 export function getFunnelBadge(conversation?: Pick<Conversation, "status" | "stage"> | null): FunnelBadgeConfig {
   if (!conversation) return defaultBadge;
   if (conversation.status === "WAITING_HUMAN") return waitingHumanBadge;
@@ -40,4 +64,9 @@ export function formatPhone(phone?: string | null): string {
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
   }
   return phone;
+}
+
+export function truncate(text?: string | null, maxLength = 50): string {
+  if (!text) return "";
+  return text.length > maxLength ? `${text.slice(0, maxLength).trimEnd()}...` : text;
 }
