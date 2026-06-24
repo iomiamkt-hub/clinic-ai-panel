@@ -5,7 +5,6 @@ import type {
   Conversation,
   Message,
   MetricsSummary,
-  TrainingExample,
 } from "@/types";
 
 export const api = axios.create({
@@ -51,9 +50,6 @@ export const configApi = {
   getConfig: () => api.get<ClinicConfig>("/api/config").then((r) => r.data),
   updateConfig: (config: Partial<ClinicConfig>) =>
     api.patch("/api/config", config).then((r) => r.data),
-  getExamples: () => api.get<TrainingExample[]>("/api/config/examples").then((r) => r.data),
-  saveExamples: (examples: TrainingExample[]) =>
-    api.post("/api/config/examples", { examples }).then((r) => r.data),
 };
 
 export const chatApi = {

@@ -9,10 +9,15 @@ interface MessagesChartProps {
 }
 
 export function MessagesChart({ data }: MessagesChartProps) {
-  const formatted = data.map((d) => ({
-    ...d,
-    label: format(parseISO(d.date), "dd/MM", { locale: ptBR }),
-  }));
+  const formatted = (data ?? []).map((d) => {
+    let label = "";
+    try {
+      label = d?.date ? format(parseISO(d.date), "dd/MM", { locale: ptBR }) : "";
+    } catch {
+      label = "";
+    }
+    return { ...d, label };
+  });
 
   return (
     <ResponsiveContainer width="100%" height={280}>

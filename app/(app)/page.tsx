@@ -69,8 +69,8 @@ export default function DashboardPage() {
               Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="h-16 animate-pulse rounded-lg bg-muted" />
               ))
-            ) : data?.recentConversations.length ? (
-              data.recentConversations.map((c) => <ConversationCard key={c.id} conversation={c} />)
+            ) : (data?.recentConversations ?? []).length ? (
+              (data?.recentConversations ?? []).map((c) => <ConversationCard key={c?.id} conversation={c} />)
             ) : (
               <p className="py-6 text-center text-sm text-muted-foreground">Nenhuma conversa encontrada.</p>
             )}

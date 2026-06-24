@@ -23,27 +23,38 @@ export default function AgendamentosPage() {
   useEffect(() => {
     appointmentsApi
       .list()
-      .then(setAppointments)
+      .then((data) => setAppointments(data ?? []))
       .catch((err) => setError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
   }, []);
 
   const filtered = useMemo(() => {
     return appointments.filter((a) => {
-      if (statusFilter !== "ALL" && a.status !== statusFilter) return false;
-      if (dateFilter && !a.dateTime.startsWith(dateFilter)) return false;
+      if (statusFilter !== "ALL" && a?.status !== statusFilter) return false;
+      if (dateFilter && !a?.dateTime?.startsWith(dateFilter)) return false;
       return true;
     });
   }, [appointments, statusFilter, dateFilter]);
 
   const counts = useMemo(() => {
-    const dates = appointments.map((a) => parseISO(a.dateTime));
+    const dates = appointments
+      .map((a) => (a?.dateTime ? parseISO(a.dateTime) : null))
+      .filter((d): d is Date => d !== null);
     return {
       today: dates.filter(isToday).length,
       week: dates.filter((d) => isThisWeek(d, { locale: ptBR })).length,
       month: dates.filter(isThisMonth).length,
     };
   }, [appointments]);
+
+  function formatDateTime(value?: string) {
+    if (!value) return "Data nao informada";
+    try {
+      return format(parseISO(value), "dd/MM/yyyy HH:mm", { locale: ptBR });
+    } catch {
+      return "Data invalida";
+    }
+  }
 
   return (
     <div className="flex flex-col">
@@ -76,17 +87,17 @@ export default function AgendamentosPage() {
               <p className="py-10 text-center text-sm text-muted-foreground">Nenhum agendamento encontrado.</p>
             ) : (
               filtered.map((a) => (
-                <div key={a.id} className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+                <div key={a?.id} className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
                   <div>
-                    <p className="text-sm font-medium text-primary">{a.patientName}</p>
+                    <p className="text-sm font-medium text-primary">{a?.patientName ?? "Paciente"}</p>
                     <p className="text-xs text-muted-foreground">
-                      {format(parseISO(a.dateTime), "dd/MM/yyyy HH:mm", { locale: ptBR })} - {a.doctor}
+                      {formatDateTime(a?.dateTime)} - {a?.doctor ?? "Medico nao informado"}
                     </p>
                   </div>
                   <Badge
-                    variant={a.status === "CONFIRMED" ? "success" : a.status === "CANCELLED" ? "danger" : "warning"}
+                    variant={a?.status === "CONFIRMED" ? "success" : a?.status === "CANCELLED" ? "danger" : "warning"}
                   >
-                    {a.status}
+                    {a?.status ?? "PENDING"}
                   </Badge>
                 </div>
               ))

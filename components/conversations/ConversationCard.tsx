@@ -9,13 +9,22 @@ const statusConfig: Record<Conversation["status"], { label: string; variant: "su
   COMPLETED: { label: "Concluida", variant: "default" },
 };
 
+function formatDate(value?: string) {
+  if (!value) return "";
+  try {
+    return format(parseISO(value), "dd/MM/yyyy HH:mm", { locale: ptBR });
+  } catch {
+    return "";
+  }
+}
+
 interface ConversationCardProps {
   conversation: Conversation;
   onClick?: () => void;
 }
 
 export function ConversationCard({ conversation, onClick }: ConversationCardProps) {
-  const status = statusConfig[conversation.status];
+  const status = statusConfig[conversation?.status] ?? statusConfig.COMPLETED;
 
   return (
     <button
@@ -23,15 +32,13 @@ export function ConversationCard({ conversation, onClick }: ConversationCardProp
       className="flex w-full items-center justify-between rounded-lg border border-border bg-white px-4 py-3 text-left transition-colors hover:bg-muted/50"
     >
       <div className="flex flex-col gap-0.5">
-        <span className="text-sm font-medium text-primary">{conversation.patientName}</span>
-        <span className="text-xs text-muted-foreground">{conversation.phone}</span>
-        <span className="text-xs text-muted-foreground">Etapa: {conversation.stage}</span>
+        <span className="text-sm font-medium text-primary">{conversation?.patientName ?? "Paciente"}</span>
+        <span className="text-xs text-muted-foreground">{conversation?.phone ?? "Sem telefone"}</span>
+        <span className="text-xs text-muted-foreground">Etapa: {conversation?.stage ?? "-"}</span>
       </div>
       <div className="flex flex-col items-end gap-1.5">
         <Badge variant={status.variant}>{status.label}</Badge>
-        <span className="text-xs text-muted-foreground">
-          {format(parseISO(conversation.updatedAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-        </span>
+        <span className="text-xs text-muted-foreground">{formatDate(conversation?.updatedAt)}</span>
       </div>
     </button>
   );

@@ -17,18 +17,21 @@ export function ConversationList() {
   useEffect(() => {
     conversationsApi
       .list()
-      .then(setConversations)
+      .then((data) => setConversations(data ?? []))
       .catch((err) => setError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
   }, []);
 
   const filtered = useMemo(
-    () => (statusFilter === "ALL" ? conversations : conversations.filter((c) => c.status === statusFilter)),
+    () =>
+      statusFilter === "ALL"
+        ? conversations
+        : conversations.filter((c) => c?.status === statusFilter),
     [conversations, statusFilter],
   );
 
   function handleStatusChanged(updated: Conversation) {
-    setConversations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    setConversations((prev) => prev.map((c) => (c?.id === updated?.id ? updated : c)));
   }
 
   return (
@@ -55,7 +58,7 @@ export function ConversationList() {
           <p className="py-10 text-center text-sm text-muted-foreground">Nenhuma conversa encontrada.</p>
         ) : (
           filtered.map((c) => (
-            <ConversationCard key={c.id} conversation={c} onClick={() => setSelectedId(c.id)} />
+            <ConversationCard key={c?.id} conversation={c} onClick={() => setSelectedId(c?.id ?? null)} />
           ))
         )}
       </div>
