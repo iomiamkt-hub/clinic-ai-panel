@@ -136,7 +136,11 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             {aiEnabled ? "🟢 IA ativa" : "🔴 IA pausada"}
           </span>
           <button
-            onClick={handleToggleAI}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              handleToggleAI();
+            }}
             disabled={aiToggling}
             style={{
               position: "relative",
