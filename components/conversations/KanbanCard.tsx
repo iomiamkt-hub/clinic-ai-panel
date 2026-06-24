@@ -1,0 +1,42 @@
+import { formatPhone, formatTimeAgo, getWaitingMinutes, truncate } from "@/lib/conversation";
+import { cn } from "@/lib/utils";
+import type { Conversation } from "@/types";
+
+interface KanbanCardProps {
+  conversation: Conversation;
+  onClick?: () => void;
+}
+
+export function KanbanCard({ conversation, onClick }: KanbanCardProps) {
+  const waitingMinutes = getWaitingMinutes(conversation);
+  const borderClass =
+    waitingMinutes !== null && waitingMinutes > 5
+      ? "border-l-4 border-l-danger animate-pulse"
+      : waitingMinutes !== null
+        ? "border-l-4 border-l-warning"
+        : "border-l-4 border-l-transparent";
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex w-full flex-col gap-1.5 rounded-lg border border-border bg-white px-3 py-2.5 text-left shadow-sm transition-colors hover:bg-muted/50",
+        borderClass,
+      )}
+    >
+      <span className="text-sm font-medium text-primary">
+        {conversation?.patient?.name ?? formatPhone(conversation?.patient?.phone)}
+      </span>
+
+      {conversation?.lastMessage?.content && (
+        <span className="text-xs text-muted-foreground">
+          &quot;{truncate(conversation.lastMessage.content, 60)}&quot;
+        </span>
+      )}
+
+      <span className="text-[10px] text-muted-foreground">
+        {formatTimeAgo(conversation?.lastMessage?.createdAt ?? conversation?.updatedAt)}
+      </span>
+    </button>
+  );
+}

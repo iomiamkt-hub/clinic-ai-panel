@@ -70,3 +70,32 @@ export function truncate(text?: string | null, maxLength = 50): string {
   if (!text) return "";
   return text.length > maxLength ? `${text.slice(0, maxLength).trimEnd()}...` : text;
 }
+
+export function formatTimeAgo(value?: string | null): string {
+  if (!value) return "";
+  try {
+    const diffMs = Date.now() - new Date(value).getTime();
+    if (Number.isNaN(diffMs)) return "";
+    const minutes = Math.floor(diffMs / 60000);
+    if (minutes < 1) return "agora";
+    if (minutes < 60) return `há ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `há ${hours}h`;
+    const days = Math.floor(hours / 24);
+    return `há ${days} dia${days > 1 ? "s" : ""}`;
+  } catch {
+    return "";
+  }
+}
+
+export function getWaitingMinutes(conversation?: Pick<Conversation, "lastMessage"> | null): number | null {
+  if (!conversation?.lastMessage || conversation.lastMessage.sender !== "PATIENT") return null;
+  if (!conversation.lastMessage.createdAt) return null;
+  try {
+    const diffMs = Date.now() - new Date(conversation.lastMessage.createdAt).getTime();
+    if (Number.isNaN(diffMs)) return null;
+    return diffMs / 60000;
+  } catch {
+    return null;
+  }
+}
