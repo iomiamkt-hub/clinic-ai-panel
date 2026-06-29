@@ -66,6 +66,17 @@ export interface TrainingExample {
   answer: string;
 }
 
+export interface DaySchedule {
+  enabled: boolean;
+  start: string;
+  end: string;
+}
+
+export type WeekSchedule = Record<
+  "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday",
+  DaySchedule
+>;
+
 export interface ClinicConfig {
   clinicName: string;
   phoneVicosa: string;
@@ -74,4 +85,8 @@ export interface ClinicConfig {
   humanDelayMin: number;
   humanDelayMax: number;
   msPerCharacter: number;
+  globalAiEnabled?: boolean;
+  pauseAiOnCompleted?: boolean;
+  schedule?: WeekSchedule;
+  outOfHoursMessage?: string;
 }

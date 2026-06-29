@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -13,6 +14,7 @@ import {
   Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { configApi } from "@/lib/api";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -25,6 +27,19 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const [aiOffline, setAiOffline] = useState(false);
+
+  useEffect(() => {
+    function fetchAiStatus() {
+      configApi
+        .getConfig()
+        .then((config) => setAiOffline(config?.globalAiEnabled === false))
+        .catch(() => {});
+    }
+    fetchAiStatus();
+    const interval = setInterval(fetchAiStatus, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <aside className="flex h-screen w-64 flex-col bg-primary text-white">
@@ -48,6 +63,11 @@ export function Sidebar() {
             >
               <Icon className="h-4.5 w-4.5" />
               {item.label}
+              {item.href === "/conversas" && aiOffline && (
+                <span className="ml-auto animate-pulse rounded-full bg-danger px-1.5 py-0.5 text-[9px] font-bold text-white">
+                  IA OFFLINE
+                </span>
+              )}
             </Link>
           );
         })}

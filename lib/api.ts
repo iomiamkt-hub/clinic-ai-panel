@@ -5,6 +5,7 @@ import type {
   Conversation,
   Message,
   MetricsSummary,
+  WeekSchedule,
 } from "@/types";
 
 export const api = axios.create({
@@ -58,6 +59,12 @@ export const configApi = {
   getConfig: () => api.get<ClinicConfig>("/api/config").then((r) => r.data),
   updateConfig: (config: Partial<ClinicConfig>) =>
     api.patch("/api/config", config).then((r) => r.data),
+  updateGlobalAi: (globalAiEnabled: boolean) =>
+    api.patch("/api/config/ai", { globalAiEnabled }).then((r) => r.data),
+  updateSchedule: (schedule: WeekSchedule) =>
+    api.patch("/api/config/schedule", { schedule }).then((r) => r.data),
+  updateOutOfHoursMessage: (message: string) =>
+    api.patch("/api/config/out-of-hours-message", { message }).then((r) => r.data),
 };
 
 export const chatApi = {
