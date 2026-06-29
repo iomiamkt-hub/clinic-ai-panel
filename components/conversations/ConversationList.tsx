@@ -7,7 +7,7 @@ import { ConversationCard } from "@/components/conversations/ConversationCard";
 import { KanbanBoard } from "@/components/conversations/KanbanBoard";
 import { Select } from "@/components/ui/select";
 import { conversationsApi, getApiErrorMessage } from "@/lib/api";
-import { FUNNEL_STAGES, getFunnelKey, type FunnelKey } from "@/lib/conversation";
+import { FUNNEL_STAGES, STAGE_PATCH_VALUE, getFunnelKey, type FunnelKey } from "@/lib/conversation";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types";
 
@@ -24,6 +24,7 @@ export function ConversationList() {
   const [error, setError] = useState("");
   const [stageFilter, setStageFilter] = useState<StageFilter>("ALL");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
 
   useEffect(() => {
     const storedView = window.localStorage.getItem(VIEW_MODE_KEY);
@@ -40,6 +41,55 @@ export function ConversationList() {
   function openConversation(id?: string | null) {
     if (!id) return;
     router.push(`/conversas/${id}`);
+  }
+
+  function showToast(message: string, variant: "success" | "error" = "success") {
+    setToast({ message, variant });
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  async function handleMoveCard(conversationId: string, newStageKey: FunnelKey) {
+    const current = conversations.find((c) => c?.id === conversationId);
+    if (!current) return;
+    const currentKey = getFunnelKey(current);
+    if (currentKey === newStageKey) return;
+
+    const previousStage = current.stage;
+    const previousStatus = current.status;
+    const stageValue = STAGE_PATCH_VALUE[newStageKey];
+    const targetLabel = FUNNEL_STAGES.find((s) => s.key === newStageKey)?.label ?? newStageKey;
+
+    setConversations((prev) =>
+      prev.map((c) =>
+        c?.id === conversationId
+          ? {
+              ...c,
+              stage: stageValue as Conversation["stage"],
+              status: newStageKey === "WAITING_HUMAN" ? "WAITING_HUMAN" : c.status === "WAITING_HUMAN" ? "ACTIVE" : c.status,
+            }
+          : c,
+      ),
+    );
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/conversations/${conversationId}/stage`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stage: stageValue }),
+        },
+      );
+      if (!response.ok) throw new Error("Falha ao mover o card");
+      showToast(`Lead movido para ${targetLabel}`, "success");
+    } catch {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c?.id === conversationId ? { ...c, stage: previousStage, status: previousStatus } : c,
+        ),
+      );
+      showToast("Nao foi possivel mover o lead. Tente novamente.", "error");
+    }
   }
 
   function changeViewMode(mode: ViewMode) {
@@ -151,7 +201,11 @@ export function ConversationList() {
             ))}
           </div>
         ) : (
-          <KanbanBoard conversations={filtered} onCardClick={(id) => openConversation(id)} />
+          <KanbanBoard
+            conversations={filtered}
+            onCardClick={(id) => openConversation(id)}
+            onMoveCard={handleMoveCard}
+          />
         )
       ) : (
         <div className="flex flex-col gap-2">
@@ -164,6 +218,17 @@ export function ConversationList() {
               <ConversationCard key={c?.id} conversation={c} onClick={() => openConversation(c?.id)} />
             ))
           )}
+        </div>
+      )}
+
+      {toast && (
+        <div
+          className={cn(
+            "fixed bottom-5 left-1/2 -translate-x-1/2 rounded-md px-4 py-2 text-xs font-medium text-white shadow-lg",
+            toast.variant === "success" ? "bg-primary" : "bg-danger",
+          )}
+        >
+          {toast.message}
         </div>
       )}
     </div>

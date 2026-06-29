@@ -35,6 +35,15 @@ export const FUNNEL_STAGES: { key: FunnelKey; label: string; className: string }
   { key: "WAITING_HUMAN", ...waitingHumanBadge },
 ];
 
+export const STAGE_PATCH_VALUE: Record<FunnelKey, string> = {
+  GREETING: "GREETING",
+  COLLECTING_INFO: "COLLECTING_INFO",
+  CHECKING_AVAILABILITY: "CHECKING_AVAILABILITY",
+  CONFIRMING: "CONFIRMING",
+  COMPLETED: "COMPLETED",
+  WAITING_HUMAN: "ESCALATED",
+};
+
 export function getFunnelKey(conversation?: Pick<Conversation, "status" | "stage"> | null): FunnelKey | null {
   if (!conversation) return null;
   if (conversation.status === "WAITING_HUMAN") return "WAITING_HUMAN";
