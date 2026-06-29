@@ -39,6 +39,12 @@ export const conversationsApi = {
     api.patch(`/api/conversations/${id}/status`, { status }).then((r) => r.data),
   reply: (id: string, message: string) =>
     api.post<Message>(`/api/conversations/${id}/reply`, { message }).then((r) => r.data),
+  updateStage: (id: string, stage: string) =>
+    api.patch(`/api/conversations/${id}/stage`, { stage }).then((r) => r.data),
+  updateTags: (id: string, tags: string[]) =>
+    api.patch(`/api/conversations/${id}/tags`, { tags }).then((r) => r.data),
+  updateNotes: (id: string, notes: string) =>
+    api.patch(`/api/conversations/${id}/notes`, { notes }).then((r) => r.data),
 };
 
 export const appointmentsApi = {

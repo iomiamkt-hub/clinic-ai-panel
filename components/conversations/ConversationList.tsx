@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { List, LayoutGrid } from "lucide-react";
 import { ConversationCard } from "@/components/conversations/ConversationCard";
-import { ConversationDetail } from "@/components/conversations/ConversationDetail";
 import { KanbanBoard } from "@/components/conversations/KanbanBoard";
 import { Select } from "@/components/ui/select";
 import { conversationsApi, getApiErrorMessage } from "@/lib/api";
@@ -15,19 +15,32 @@ type ViewMode = "list" | "kanban";
 type StageFilter = FunnelKey | "ALL" | "AI_PAUSED";
 
 const VIEW_MODE_KEY = "conversas-view-mode";
+const STAGE_FILTER_KEY = "conversas-stage-filter";
 
 export function ConversationList() {
+  const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [stageFilter, setStageFilter] = useState<StageFilter>("ALL");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(VIEW_MODE_KEY);
-    if (stored === "list" || stored === "kanban") setViewMode(stored);
+    const storedView = window.localStorage.getItem(VIEW_MODE_KEY);
+    if (storedView === "list" || storedView === "kanban") setViewMode(storedView);
+    const storedStage = window.localStorage.getItem(STAGE_FILTER_KEY);
+    if (storedStage) setStageFilter(storedStage as StageFilter);
   }, []);
+
+  function changeStageFilter(value: StageFilter) {
+    setStageFilter(value);
+    window.localStorage.setItem(STAGE_FILTER_KEY, value);
+  }
+
+  function openConversation(id?: string | null) {
+    if (!id) return;
+    router.push(`/conversas/${id}`);
+  }
 
   function changeViewMode(mode: ViewMode) {
     setViewMode(mode);
@@ -100,7 +113,7 @@ export function ConversationList() {
         {FUNNEL_STAGES.map((stage) => (
           <button
             key={stage.key}
-            onClick={() => setStageFilter((prev) => (prev === stage.key ? "ALL" : stage.key))}
+            onClick={() => changeStageFilter(stageFilter === stage.key ? "ALL" : stage.key)}
             className={cn(
               "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
               stage.className,
@@ -115,7 +128,7 @@ export function ConversationList() {
       <div className="flex items-center gap-3">
         <Select
           value={stageFilter}
-          onChange={(e) => setStageFilter(e.target.value as StageFilter)}
+          onChange={(e) => changeStageFilter(e.target.value as StageFilter)}
           className="w-56"
         >
           <option value="ALL">Todos</option>
@@ -138,7 +151,7 @@ export function ConversationList() {
             ))}
           </div>
         ) : (
-          <KanbanBoard conversations={filtered} onCardClick={(id) => setSelectedId(id)} />
+          <KanbanBoard conversations={filtered} onCardClick={(id) => openConversation(id)} />
         )
       ) : (
         <div className="flex flex-col gap-2">
@@ -148,14 +161,10 @@ export function ConversationList() {
             <p className="py-10 text-center text-sm text-muted-foreground">Nenhuma conversa encontrada.</p>
           ) : (
             filtered.map((c) => (
-              <ConversationCard key={c?.id} conversation={c} onClick={() => setSelectedId(c?.id ?? null)} />
+              <ConversationCard key={c?.id} conversation={c} onClick={() => openConversation(c?.id)} />
             ))
           )}
         </div>
-      )}
-
-      {selectedId && (
-        <ConversationDetail conversationId={selectedId} onClose={() => setSelectedId(null)} />
       )}
     </div>
   );

@@ -29,6 +29,10 @@ export interface Conversation {
   updatedAt: string;
   createdAt: string;
   aiEnabled?: boolean;
+  tags?: string[];
+  notes?: string | null;
+  firstMessageAt?: string | null;
+  appointment?: Appointment | null;
 }
 
 export interface Message {
