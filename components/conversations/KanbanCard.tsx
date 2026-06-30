@@ -47,8 +47,8 @@ export function KanbanCard({ conversation, onClick, onDragStart, onDragEnd }: Ka
       <div className="flex items-start justify-between gap-1">
         <span className="text-sm font-medium text-primary">{displayName}</span>
         {conversation?.aiEnabled === false && (
-          <span className="shrink-0 rounded-full bg-danger/10 px-1.5 py-0.5 text-[9px] font-semibold text-danger">
-            IA pausada
+          <span className="shrink-0 rounded-full bg-danger/10 px-1.5 py-0.5 text-[9px] font-semibold text-danger" title="IA pausada">
+            🔴
           </span>
         )}
       </div>

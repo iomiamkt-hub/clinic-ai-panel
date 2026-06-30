@@ -155,17 +155,24 @@ export function ConversationFullView({ conversationId }: ConversationFullViewPro
     setStage(newStage);
     setStageSaving(true);
     try {
-      await conversationsApi.updateStage(conversationId, newStage);
+      const result = await conversationsApi.updateStage(conversationId, newStage);
+      const aiPausedAuto = result?.aiPausedAutomatically === true;
       setConversation((prev) =>
         prev
           ? {
               ...prev,
               stage: newStage === "WAITING_HUMAN" ? prev.stage : (newStage as Conversation["stage"]),
               status: newStage === "WAITING_HUMAN" ? "WAITING_HUMAN" : prev.status,
+              ...(aiPausedAuto ? { aiEnabled: false } : {}),
             }
           : prev,
       );
-      showToast("Etapa atualizada com sucesso");
+      if (aiPausedAuto) {
+        setAiEnabled(false);
+        showToast("✅ Lead marcado como Agendado. IA pausada automaticamente para esta conversa.");
+      } else {
+        showToast("Etapa atualizada com sucesso");
+      }
     } catch (err) {
       setStage(previous);
       showToast(getApiErrorMessage(err));

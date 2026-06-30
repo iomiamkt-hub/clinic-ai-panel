@@ -81,7 +81,15 @@ export function ConversationList() {
         },
       );
       if (!response.ok) throw new Error("Falha ao mover o card");
-      showToast(`Lead movido para ${targetLabel}`, "success");
+      const body = await response.json().catch(() => ({}));
+      if (body?.aiPausedAutomatically === true) {
+        setConversations((prev) =>
+          prev.map((c) => (c?.id === conversationId ? { ...c, aiEnabled: false } : c)),
+        );
+        showToast(`Lead movido para ${targetLabel}. IA pausada automaticamente.`, "success");
+      } else {
+        showToast(`Lead movido para ${targetLabel}`, "success");
+      }
     } catch {
       setConversations((prev) =>
         prev.map((c) =>

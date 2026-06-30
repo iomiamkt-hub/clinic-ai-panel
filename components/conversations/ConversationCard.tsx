@@ -38,7 +38,9 @@ export function ConversationCard({ conversation, onClick }: ConversationCardProp
           {conversation?.patient?.name ?? "Paciente sem nome"}
         </span>
         <div className="flex items-center gap-1.5">
-          {conversation?.aiEnabled === false && <Badge variant="danger">IA pausada</Badge>}
+          {conversation?.aiEnabled === false && (
+            <Badge variant="danger" title="IA pausada">🔴 IA pausada</Badge>
+          )}
           <Badge variant={status.variant}>{status.label}</Badge>
         </div>
       </div>
