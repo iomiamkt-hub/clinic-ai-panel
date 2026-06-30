@@ -17,7 +17,15 @@ export interface Patient {
 export interface LastMessage {
   content?: string | null;
   sender?: "PATIENT" | "LORENA" | "HUMAN";
+  sentAt?: string;
   createdAt?: string;
+}
+
+export interface ConversationMessage {
+  sentAt?: string;
+  createdAt?: string;
+  sender?: "PATIENT" | "LORENA" | "HUMAN";
+  content?: string | null;
 }
 
 export interface Conversation {
@@ -26,6 +34,8 @@ export interface Conversation {
   stage?: ConversationStage | null;
   status: ConversationStatus;
   lastMessage?: LastMessage | null;
+  messages?: ConversationMessage[];
+  lastMessageAt?: string | null;
   updatedAt: string;
   createdAt: string;
   aiEnabled?: boolean;

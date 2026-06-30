@@ -1,4 +1,4 @@
-import type { Conversation, ConversationStage } from "@/types";
+import type { Conversation, ConversationMessage, ConversationStage } from "@/types";
 
 interface FunnelBadgeConfig {
   label: string;
@@ -98,10 +98,12 @@ export function formatTimeAgo(value?: string | null): string {
 }
 
 export function getWaitingMinutes(conversation?: Pick<Conversation, "lastMessage"> | null): number | null {
-  if (!conversation?.lastMessage || conversation.lastMessage.sender !== "PATIENT") return null;
-  if (!conversation.lastMessage.createdAt) return null;
+  const msg = conversation?.lastMessage;
+  if (!msg || msg.sender !== "PATIENT") return null;
+  const at = msg.sentAt ?? msg.createdAt;
+  if (!at) return null;
   try {
-    const diffMs = Date.now() - new Date(conversation.lastMessage.createdAt).getTime();
+    const diffMs = Date.now() - new Date(at).getTime();
     if (Number.isNaN(diffMs)) return null;
     return diffMs / 60000;
   } catch {
@@ -115,15 +117,30 @@ export type LastMessageStatus =
   | { kind: "unknown" };
 
 export function getLastMessageStatus(
-  conversation?: Pick<Conversation, "lastMessage" | "updatedAt"> | null,
+  conversation?: Pick<Conversation, "lastMessage" | "messages" | "lastMessageAt" | "createdAt"> | null,
 ): LastMessageStatus {
-  const msg = conversation?.lastMessage;
-  const at = msg?.createdAt ?? conversation?.updatedAt;
+  // Resolve the best available message record, preferring messages[0] (has sentAt)
+  const apiMsg: ConversationMessage | undefined = conversation?.messages?.[0];
+  const lastMsg = conversation?.lastMessage;
+
+  // Timestamp: sentAt > createdAt from the message record, then lastMessageAt, then conversation.createdAt
+  const at =
+    apiMsg?.sentAt ??
+    apiMsg?.createdAt ??
+    lastMsg?.sentAt ??
+    lastMsg?.createdAt ??
+    conversation?.lastMessageAt ??
+    conversation?.createdAt;
+
   if (!at) return { kind: "unknown" };
+
+  // Sender: prefer messages[0].sender, fall back to lastMessage.sender
+  const sender = apiMsg?.sender ?? lastMsg?.sender;
+
   try {
     const minutes = (Date.now() - new Date(at).getTime()) / 60000;
     if (Number.isNaN(minutes)) return { kind: "unknown" };
-    if (msg?.sender === "PATIENT") return { kind: "waiting", minutes, at };
+    if (sender === "PATIENT") return { kind: "waiting", minutes, at };
     return { kind: "answered", minutes, at };
   } catch {
     return { kind: "unknown" };
