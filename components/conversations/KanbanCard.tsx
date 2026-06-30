@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { formatTimeAgo, getWaitingMinutes, truncate } from "@/lib/conversation";
+import {
+  formatExactDateTime,
+  formatLastMessageLabel,
+  getLastMessageStatus,
+  truncate,
+} from "@/lib/conversation";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types";
 
@@ -12,16 +17,32 @@ interface KanbanCardProps {
 
 export function KanbanCard({ conversation, onClick, onDragStart, onDragEnd }: KanbanCardProps) {
   const [isDragging, setIsDragging] = useState(false);
+
   const phone = conversation?.patient?.phone;
   const displayName =
     conversation?.patient?.name || (phone ? phone.replace("55", "+55 ") : "Paciente");
-  const waitingMinutes = getWaitingMinutes(conversation);
-  const borderClass =
-    waitingMinutes !== null && waitingMinutes > 5
-      ? "border-l-4 border-l-danger animate-pulse"
-      : waitingMinutes !== null
-        ? "border-l-4 border-l-warning"
-        : "border-l-4 border-l-transparent";
+
+  const msgStatus = getLastMessageStatus(conversation);
+  const timeLabel = formatLastMessageLabel(msgStatus);
+  const tooltip =
+    msgStatus.kind !== "unknown"
+      ? `Ultima mensagem: ${formatExactDateTime(msgStatus.at)}`
+      : undefined;
+
+  const isWaiting = msgStatus.kind === "waiting";
+  const isUrgent = isWaiting && msgStatus.minutes > 60;
+
+  const borderClass = isUrgent
+    ? "border-l-4 border-l-danger"
+    : isWaiting
+      ? "border-l-4 border-l-warning"
+      : "border-l-4 border-l-transparent";
+
+  const timeLabelClass = isUrgent
+    ? "text-danger font-semibold"
+    : isWaiting
+      ? "text-warning font-semibold"
+      : "text-muted-foreground";
 
   return (
     <button
@@ -47,7 +68,10 @@ export function KanbanCard({ conversation, onClick, onDragStart, onDragEnd }: Ka
       <div className="flex items-start justify-between gap-1">
         <span className="text-sm font-medium text-primary">{displayName}</span>
         {conversation?.aiEnabled === false && (
-          <span className="shrink-0 rounded-full bg-danger/10 px-1.5 py-0.5 text-[9px] font-semibold text-danger" title="IA pausada">
+          <span
+            className="shrink-0 rounded-full bg-danger/10 px-1.5 py-0.5 text-[9px] font-semibold text-danger"
+            title="IA pausada"
+          >
             🔴
           </span>
         )}
@@ -59,9 +83,11 @@ export function KanbanCard({ conversation, onClick, onDragStart, onDragEnd }: Ka
         </span>
       )}
 
-      <span className="text-[10px] text-muted-foreground">
-        {formatTimeAgo(conversation?.lastMessage?.createdAt ?? conversation?.updatedAt)}
-      </span>
+      {timeLabel && (
+        <span className={cn("text-[10px]", timeLabelClass)} title={tooltip}>
+          {timeLabel}
+        </span>
+      )}
     </button>
   );
 }

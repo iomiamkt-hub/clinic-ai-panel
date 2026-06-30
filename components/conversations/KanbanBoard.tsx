@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { KanbanCard } from "@/components/conversations/KanbanCard";
-import { FUNNEL_STAGES, getFunnelKey, getWaitingMinutes, type FunnelKey } from "@/lib/conversation";
+import { FUNNEL_STAGES, getFunnelKey, getLastMessageStatus, type FunnelKey } from "@/lib/conversation";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "@/types";
 
@@ -17,10 +17,20 @@ export function KanbanBoard({ conversations, onCardClick, onMoveCard }: KanbanBo
     return FUNNEL_STAGES.map((stage) => {
       const items = conversations.filter((c) => getFunnelKey(c) === stage.key);
       items.sort((a, b) => {
-        const waitA = getWaitingMinutes(a) ?? -1;
-        const waitB = getWaitingMinutes(b) ?? -1;
-        if (waitA !== waitB) return waitB - waitA;
-        return new Date(b?.updatedAt ?? 0).getTime() - new Date(a?.updatedAt ?? 0).getTime();
+        const sA = getLastMessageStatus(a);
+        const sB = getLastMessageStatus(b);
+        const waitingA = sA.kind === "waiting";
+        const waitingB = sB.kind === "waiting";
+        // Waiting patients come before answered ones
+        if (waitingA !== waitingB) return waitingA ? -1 : 1;
+        if (waitingA && waitingB) {
+          // Both waiting: oldest wait first (most urgent at top)
+          return (sB.minutes ?? 0) - (sA.minutes ?? 0);
+        }
+        // Both answered: most recently answered first
+        const atA = sA.kind !== "unknown" ? new Date(sA.at).getTime() : 0;
+        const atB = sB.kind !== "unknown" ? new Date(sB.at).getTime() : 0;
+        return atB - atA;
       });
       return { ...stage, items };
     });

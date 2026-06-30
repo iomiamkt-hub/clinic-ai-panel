@@ -108,3 +108,58 @@ export function getWaitingMinutes(conversation?: Pick<Conversation, "lastMessage
     return null;
   }
 }
+
+export type LastMessageStatus =
+  | { kind: "waiting"; minutes: number; at: string }
+  | { kind: "answered"; minutes: number; at: string }
+  | { kind: "unknown" };
+
+export function getLastMessageStatus(
+  conversation?: Pick<Conversation, "lastMessage" | "updatedAt"> | null,
+): LastMessageStatus {
+  const msg = conversation?.lastMessage;
+  const at = msg?.createdAt ?? conversation?.updatedAt;
+  if (!at) return { kind: "unknown" };
+  try {
+    const minutes = (Date.now() - new Date(at).getTime()) / 60000;
+    if (Number.isNaN(minutes)) return { kind: "unknown" };
+    if (msg?.sender === "PATIENT") return { kind: "waiting", minutes, at };
+    return { kind: "answered", minutes, at };
+  } catch {
+    return { kind: "unknown" };
+  }
+}
+
+export function formatLastMessageLabel(status: LastMessageStatus): string {
+  if (status.kind === "unknown") return "";
+  const { minutes } = status;
+  let duration: string;
+  if (minutes < 1) {
+    duration = "agora";
+  } else if (minutes < 60) {
+    duration = `${Math.floor(minutes)}min`;
+  } else if (minutes < 1440) {
+    duration = `${Math.floor(minutes / 60)}h`;
+  } else {
+    duration = `${Math.floor(minutes / 1440)}d`;
+  }
+  if (status.kind === "waiting") {
+    return duration === "agora" ? "Aguardando agora" : `Aguardando há ${duration}`;
+  }
+  return duration === "agora" ? "Respondido agora" : `Respondido há ${duration}`;
+}
+
+export function formatExactDateTime(isoString?: string | null): string {
+  if (!isoString) return "";
+  try {
+    const d = new Date(isoString);
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+    return `${dd}/${mm}/${yyyy} às ${hh}:${min}`;
+  } catch {
+    return "";
+  }
+}
