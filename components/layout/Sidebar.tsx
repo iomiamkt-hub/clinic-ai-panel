@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
   Eye,
+  Smartphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { configApi } from "@/lib/api";
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/agendamentos", label: "Agendamentos", icon: CalendarClock },
   { href: "/treinamento", label: "Treinamento", icon: GraduationCap },
   { href: "/configuracoes", label: "Configuracoes", icon: Settings },
+  { href: "/whatsapp", label: "WhatsApp", icon: Smartphone },
 ];
 
 export function Sidebar() {
