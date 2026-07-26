@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 const EVOLUTION_BASE = "https://evolution-api-production-d727.up.railway.app";
 const API_KEY = "Iomiamkt@2026";
-const INSTANCE = "clinica";
+const INSTANCE = "novoolhar";
 
 export async function POST() {
   try {
