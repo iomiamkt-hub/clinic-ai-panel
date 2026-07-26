@@ -10,33 +10,25 @@ export async function GET() {
       headers: { apikey: API_KEY },
       cache: "no-store",
     });
+
     if (!res.ok) {
-      return NextResponse.json({ error: "Falha ao buscar instâncias" }, { status: res.status });
+      return NextResponse.json({ error: "Falha ao buscar instancias" }, { status: res.status });
     }
+
     const data = await res.json();
-    const instances: unknown[] = Array.isArray(data) ? data : [];
+    const instances = Array.isArray(data) ? data : [];
+
     const instance = instances.find(
-      (i): i is Record<string, unknown> =>
-        typeof i === "object" && i !== null && (i as Record<string, unknown>).instance !== undefined
-          ? (((i as Record<string, unknown>).instance as Record<string, unknown>)?.instanceName ?? (i as Record<string, unknown>).instanceName) === INSTANCE
-          : false,
+      (i: Record<string, unknown>) => i.name === INSTANCE
     );
 
     if (!instance) {
       return NextResponse.json({ connected: false, status: "not_found" });
     }
 
-    const inner =
-      typeof instance.instance === "object" && instance.instance !== null
-        ? (instance.instance as Record<string, unknown>)
-        : instance;
-
-    const status = String(inner.connectionStatus ?? inner.state ?? inner.status ?? "unknown");
+    const status = String(instance.connectionStatus ?? "unknown");
     const connected = status === "open";
-    const phone =
-      (inner.ownerJid as string | undefined) ??
-      (inner.number as string | undefined) ??
-      null;
+    const phone = (instance.ownerJid as string | undefined)?.replace("@s.whatsapp.net", "") ?? null;
 
     return NextResponse.json({ connected, status, phone });
   } catch {
