@@ -65,7 +65,11 @@ export function translateStage(stage?: ConversationStage | null): string {
 
 export function formatPhone(phone?: string | null): string {
   if (!phone) return "Telefone nao informado";
-  const digits = phone.replace(/\D/g, "");
+  let digits = phone.replace(/\D/g, "");
+  // Remove DDI 55 quando o número tiver 12 ou 13 dígitos (55 + DDD + número)
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) {
+    digits = digits.slice(2);
+  }
   if (digits.length === 11) {
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
   }

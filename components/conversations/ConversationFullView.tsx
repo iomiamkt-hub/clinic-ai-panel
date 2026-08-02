@@ -221,10 +221,19 @@ export function ConversationFullView({ conversationId }: ConversationFullViewPro
 
   const funnel = getFunnelBadge(conversation);
   const firstMessageAt = useMemo(() => {
-    if (conversation?.firstMessageAt) return conversation.firstMessageAt;
-    return messages.length > 0 ? messages[0]?.createdAt : null;
+    if (messages.length > 0) {
+      const m = messages[0] as Message & { sentAt?: string };
+      return m?.sentAt ?? m?.createdAt ?? null;
+    }
+    return conversation?.firstMessageAt ?? null;
   }, [conversation, messages]);
-  const lastMessageAt = messages.length > 0 ? messages[messages.length - 1]?.createdAt : conversation?.updatedAt;
+  const lastMessageAt = useMemo(() => {
+    if (messages.length > 0) {
+      const m = messages[messages.length - 1] as Message & { sentAt?: string };
+      return m?.sentAt ?? m?.createdAt ?? null;
+    }
+    return conversation?.lastMessageAt ?? null;
+  }, [conversation, messages]);
 
   return (
     <div className="flex h-screen flex-col bg-white">
@@ -239,7 +248,9 @@ export function ConversationFullView({ conversationId }: ConversationFullViewPro
           </button>
           <div className="flex flex-col gap-1">
             <h1 className="text-base font-semibold text-primary">
-              {conversation?.patient?.name ?? (loading ? "Carregando..." : "Paciente sem nome")}
+              {loading
+              ? "Carregando..."
+              : (conversation?.patient?.name ?? conversation?.patient?.phone ?? "Paciente sem nome")}
             </h1>
             <p className="text-xs text-muted-foreground">{formatPhone(conversation?.patient?.phone)}</p>
           </div>
@@ -334,7 +345,7 @@ export function ConversationFullView({ conversationId }: ConversationFullViewPro
             <div className="flex flex-col gap-1 text-sm text-muted-foreground">
               <p>
                 <span className="font-medium text-foreground">Nome:</span>{" "}
-                {conversation?.patient?.name ?? "Nao informado"}
+                {conversation?.patient?.name ?? conversation?.patient?.phone ?? "Nao informado"}
               </p>
               <p>
                 <span className="font-medium text-foreground">Telefone:</span>{" "}
