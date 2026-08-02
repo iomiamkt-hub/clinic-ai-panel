@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowLeft, Send, X } from "lucide-react";
+import { ArrowLeft, Clock, FileText, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,7 +13,7 @@ import { Select } from "@/components/ui/select";
 import { conversationsApi, getApiErrorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { FUNNEL_STAGES, formatPhone, getFunnelBadge } from "@/lib/conversation";
-import type { Conversation, Message } from "@/types";
+import type { Conversation, Message, TimelineEvent } from "@/types";
 
 function formatDate(value?: string | null, pattern = "dd/MM/yyyy HH:mm") {
   if (!value) return "Nao informado";
@@ -367,6 +367,85 @@ export function ConversationFullView({ conversationId }: ConversationFullViewPro
                 </option>
               ))}
             </Select>
+          </section>
+
+          {/* ── Resumo do paciente ── */}
+          <section className="flex flex-col gap-2">
+            <h3 className="flex items-center gap-1.5 text-sm font-semibold text-primary">
+              <FileText className="h-3.5 w-3.5" />
+              Resumo do paciente
+            </h3>
+            <div className="rounded-lg bg-blue-50 px-3 py-2.5 text-sm">
+              {conversation?.patientSummary ? (
+                <p className="italic text-blue-800">{conversation.patientSummary}</p>
+              ) : (
+                <p className="italic text-blue-400">
+                  Resumo sera gerado automaticamente conforme o atendimento avança.
+                </p>
+              )}
+            </div>
+          </section>
+
+          {/* ── Dados coletados ── */}
+          {conversation?.patientData && Object.keys(conversation.patientData).length > 0 && (
+            <section className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-primary">Dados coletados</h3>
+                {conversation.missingFields && conversation.missingFields.length > 0 && (
+                  <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[11px] font-semibold text-danger">
+                    {conversation.missingFields.length} dado{conversation.missingFields.length > 1 ? "s" : ""} pendente{conversation.missingFields.length > 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-col gap-1">
+                {Object.entries(conversation.patientData).map(([key, value]) => (
+                  <div key={key} className="flex items-center gap-1.5 text-xs">
+                    <span className="text-success">✓</span>
+                    <span className="font-medium capitalize text-foreground">{key}:</span>
+                    <span className="text-muted-foreground">{String(value ?? "")}</span>
+                  </div>
+                ))}
+                {conversation.missingFields?.map((field) => (
+                  <div key={field} className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
+                    <span>✗</span>
+                    <span className="capitalize">{field}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── Próxima ação ── */}
+          {conversation?.nextAction && (
+            <section className="flex flex-col gap-1.5">
+              <h3 className="text-sm font-semibold text-primary">Proxima acao</h3>
+              <span className="inline-flex w-fit items-center rounded-full bg-secondary/10 px-3 py-1 text-xs font-semibold text-secondary">
+                {conversation.nextAction}
+              </span>
+            </section>
+          )}
+
+          {/* ── Linha do tempo ── */}
+          <section className="flex flex-col gap-2">
+            <h3 className="flex items-center gap-1.5 text-sm font-semibold text-primary">
+              <Clock className="h-3.5 w-3.5" />
+              Linha do tempo
+            </h3>
+            {!conversation?.timeline || conversation.timeline.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Nenhum evento registrado ainda.</p>
+            ) : (
+              <ol className="flex flex-col gap-2 border-l-2 border-border pl-3">
+                {(conversation.timeline as TimelineEvent[]).slice(0, 10).map((ev, i) => (
+                  <li key={i} className="flex flex-col gap-0.5">
+                    <span className="text-[10px] font-semibold text-muted-foreground">
+                      {formatDate(ev.timestamp, "dd/MM HH:mm")}
+                    </span>
+                    <span className="text-xs text-foreground">{ev.event}</span>
+                    {ev.detail && <span className="text-[11px] text-muted-foreground">{ev.detail}</span>}
+                  </li>
+                ))}
+              </ol>
+            )}
           </section>
 
           <section className="flex flex-col gap-2">

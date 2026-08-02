@@ -28,6 +28,12 @@ export interface ConversationMessage {
   content?: string | null;
 }
 
+export interface TimelineEvent {
+  timestamp: string;
+  event: string;
+  detail?: string;
+}
+
 export interface Conversation {
   id: string;
   patient?: Patient | null;
@@ -43,6 +49,12 @@ export interface Conversation {
   notes?: string | null;
   firstMessageAt?: string | null;
   appointment?: Appointment | null;
+  patientData?: Record<string, unknown>;
+  patientSummary?: string;
+  conversationFacts?: string[];
+  timeline?: TimelineEvent[];
+  missingFields?: string[];
+  nextAction?: string;
 }
 
 export interface Message {
