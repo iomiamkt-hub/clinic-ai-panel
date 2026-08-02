@@ -79,9 +79,26 @@ export function ConversationFullView({ conversationId }: ConversationFullViewPro
     conversationsApi
       .get(conversationId)
       .then((data) => {
-        const conv = data?.conversation ?? null;
+        // DEBUG — remover após confirmar o shape da API
+        console.log("Conversation data:", JSON.stringify(data, null, 2));
+
+        // A API pode retornar { conversation, messages } ou a conversa diretamente
+        const raw = data as Record<string, unknown>;
+        const conv: Conversation | null =
+          (raw?.conversation as Conversation) ??
+          (raw?.id ? (raw as unknown as Conversation) : null);
+
+        // Mensagens podem vir em data.messages ou conv.messages
+        const msgs: Message[] =
+          (raw?.messages as Message[]) ??
+          (conv?.messages as unknown as Message[]) ??
+          [];
+
+        console.log("Parsed patient:", JSON.stringify(conv?.patient, null, 2));
+        console.log("Messages count:", msgs.length);
+
         setConversation(conv);
-        setMessages(data?.messages ?? []);
+        setMessages(msgs);
         setAiEnabled(conv?.aiEnabled ?? true);
         setStage((conv?.status === "WAITING_HUMAN" ? "WAITING_HUMAN" : conv?.stage) ?? "");
         setTags(conv?.tags ?? []);
