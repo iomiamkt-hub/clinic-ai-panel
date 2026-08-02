@@ -236,6 +236,8 @@ export function ConversationFullView({ conversationId }: ConversationFullViewPro
     }
   }
 
+  const [activeTab, setActiveTab] = useState<"conversa" | "memoria">("conversa");
+
   const funnel = getFunnelBadge(conversation);
   const firstMessageAt = useMemo(() => {
     if (messages.length > 0) {
@@ -316,44 +318,169 @@ export function ConversationFullView({ conversationId }: ConversationFullViewPro
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex w-[65%] flex-col border-r border-border">
-          <div className="flex-1 overflow-y-auto bg-muted/30 px-6 py-4 scrollbar-thin">
-            {loading ? (
-              <p className="text-center text-sm text-muted-foreground">Carregando historico...</p>
-            ) : (messages ?? []).length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground">Nenhuma mensagem ainda.</p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {(messages ?? []).map((msg) => {
-                  const config = senderConfig[msg?.sender] ?? senderConfig.PATIENT;
-                  return (
-                    <div key={msg?.id ?? Math.random()} className={cn("flex max-w-[80%] flex-col gap-0.5", config.align)}>
-                      {config.label && (
-                        <span className="px-1 text-[10px] font-medium text-muted-foreground">{config.label}</span>
-                      )}
-                      <div className={cn("rounded-lg px-3 py-2 text-sm", config.bubble)}>
-                        <p>{msg?.content ?? ""}</p>
-                        <p className="mt-1 text-[10px] text-white/70">{formatDate(msg?.createdAt, "dd/MM HH:mm")}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+          {/* Abas */}
+          <div className="flex border-b border-border">
+            {(["conversa", "memoria"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "px-5 py-2.5 text-sm font-medium transition-colors",
+                  activeTab === tab
+                    ? "border-b-2 border-secondary text-secondary"
+                    : "text-muted-foreground hover:text-primary",
+                )}
+              >
+                {tab === "conversa" ? "💬 Conversa" : "🧠 Memória da IA"}
+              </button>
+            ))}
           </div>
 
-          <div className="flex flex-col gap-2 border-t border-border px-6 py-4">
-            {replyError && <div className="rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">{replyError}</div>}
-            <Textarea
-              value={reply}
-              onChange={(e) => setReply(e.target.value)}
-              placeholder="Digite uma resposta como secretaria..."
-              rows={2}
-            />
-            <Button onClick={handleSendReply} disabled={sending || !reply.trim()} className="self-end">
-              <Send className="h-4 w-4" />
-              {sending ? "Enviando..." : "Enviar"}
-            </Button>
-          </div>
+          {activeTab === "conversa" ? (
+            <>
+              <div className="flex-1 overflow-y-auto bg-muted/30 px-6 py-4 scrollbar-thin">
+                {loading ? (
+                  <p className="text-center text-sm text-muted-foreground">Carregando historico...</p>
+                ) : (messages ?? []).length === 0 ? (
+                  <p className="text-center text-sm text-muted-foreground">Nenhuma mensagem ainda.</p>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {(messages ?? []).map((msg) => {
+                      const config = senderConfig[msg?.sender] ?? senderConfig.PATIENT;
+                      return (
+                        <div key={msg?.id ?? Math.random()} className={cn("flex max-w-[80%] flex-col gap-0.5", config.align)}>
+                          {config.label && (
+                            <span className="px-1 text-[10px] font-medium text-muted-foreground">{config.label}</span>
+                          )}
+                          <div className={cn("rounded-lg px-3 py-2 text-sm", config.bubble)}>
+                            <p>{msg?.content ?? ""}</p>
+                            <p className="mt-1 text-[10px] text-white/70">{formatDate(msg?.createdAt, "dd/MM HH:mm")}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2 border-t border-border px-6 py-4">
+                {replyError && <div className="rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">{replyError}</div>}
+                <Textarea
+                  value={reply}
+                  onChange={(e) => setReply(e.target.value)}
+                  placeholder="Digite uma resposta como secretaria..."
+                  rows={2}
+                />
+                <Button onClick={handleSendReply} disabled={sending || !reply.trim()} className="self-end">
+                  <Send className="h-4 w-4" />
+                  {sending ? "Enviando..." : "Enviar"}
+                </Button>
+              </div>
+            </>
+          ) : (
+            /* ── Aba Memória da IA ── */
+            <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-6 py-5 scrollbar-thin">
+              {/* Estado atual */}
+              {conversation?.currentState && (
+                <section className="flex flex-col gap-1.5">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Estado atual</h3>
+                  <span className="inline-flex w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                    {conversation.currentState}
+                  </span>
+                </section>
+              )}
+
+              {/* Próxima ação */}
+              {conversation?.nextAction && (
+                <section className="flex flex-col gap-1.5">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Próxima ação</h3>
+                  <span className="inline-flex w-fit rounded-full bg-secondary/10 px-3 py-1 text-xs font-semibold text-secondary">
+                    {conversation.nextAction}
+                  </span>
+                </section>
+              )}
+
+              {/* Campos pendentes */}
+              {(conversation?.missingFields ?? []).length > 0 && (
+                <section className="flex flex-col gap-1.5">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Campos pendentes
+                    <span className="ml-2 rounded-full bg-danger/10 px-2 py-0.5 text-[10px] text-danger">
+                      {conversation!.missingFields!.length}
+                    </span>
+                  </h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {conversation!.missingFields!.map((f) => (
+                      <span key={f} className="rounded-full bg-danger/10 px-2.5 py-1 text-xs font-medium text-danger">
+                        ✗ {f}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Dados do paciente coletados */}
+              {conversation?.patientData && Object.keys(conversation.patientData).length > 0 && (
+                <section className="flex flex-col gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dados coletados</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(conversation.patientData).map(([key, val]) => (
+                      <div key={key} className="flex flex-col gap-0.5 rounded-lg border border-border bg-muted/30 px-3 py-2">
+                        <span className="text-[10px] font-semibold uppercase text-muted-foreground">{key}</span>
+                        <span className="text-xs font-medium text-primary">{String(val ?? "")}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Perfil comportamental */}
+              {conversation?.behaviorProfile && (
+                <section className="flex flex-col gap-1.5">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Perfil comportamental</h3>
+                  <p className="text-sm italic text-muted-foreground">{conversation.behaviorProfile}</p>
+                </section>
+              )}
+
+              {/* Fatos contextuais */}
+              {(conversation?.conversationFacts ?? []).length > 0 && (
+                <section className="flex flex-col gap-1.5">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fatos contextuais</h3>
+                  <ul className="flex flex-col gap-1">
+                    {(conversation!.conversationFacts!).map((fact, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                        <span className="mt-0.5 shrink-0 text-secondary">•</span>
+                        {fact}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {/* Timeline completa */}
+              <section className="flex flex-col gap-2">
+                <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  Linha do tempo completa
+                </h3>
+                {!conversation?.timeline || conversation.timeline.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhum evento registrado ainda.</p>
+                ) : (
+                  <ol className="flex flex-col gap-2 border-l-2 border-border pl-3">
+                    {(conversation.timeline as TimelineEvent[]).map((ev, i) => (
+                      <li key={i} className="flex flex-col gap-0.5">
+                        <span className="text-[10px] font-semibold text-muted-foreground">
+                          {formatDate(ev.timestamp, "dd/MM HH:mm")}
+                        </span>
+                        <span className="text-xs text-foreground">{ev.event}</span>
+                        {ev.detail && <span className="text-[11px] text-muted-foreground">{ev.detail}</span>}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+            </div>
+          )}
         </div>
 
         <div className="flex w-[35%] flex-col gap-6 overflow-y-auto px-6 py-5 scrollbar-thin">

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { List, LayoutGrid } from "lucide-react";
 import { ConversationCard } from "@/components/conversations/ConversationCard";
 import { KanbanBoard } from "@/components/conversations/KanbanBoard";
+import { PatientProfilePanel } from "@/components/conversations/PatientProfilePanel";
 import { Select } from "@/components/ui/select";
 import { conversationsApi, getApiErrorMessage } from "@/lib/api";
 import { FUNNEL_STAGES, STAGE_PATCH_VALUE, getFunnelKey, type FunnelKey } from "@/lib/conversation";
@@ -25,6 +26,7 @@ export function ConversationList() {
   const [stageFilter, setStageFilter] = useState<StageFilter>("ALL");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
 
   useEffect(() => {
     const storedView = window.localStorage.getItem(VIEW_MODE_KEY);
@@ -41,6 +43,12 @@ export function ConversationList() {
   function openConversation(id?: string | null) {
     if (!id) return;
     router.push(`/conversas/${id}`);
+  }
+
+  function openKanbanProfile(id?: string | null) {
+    if (!id) return;
+    const conv = conversations.find((c) => c?.id === id) ?? null;
+    setSelectedConversation(conv);
   }
 
   function showToast(message: string, variant: "success" | "error" = "success") {
@@ -201,33 +209,48 @@ export function ConversationList() {
 
       {error && <div className="rounded-md bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}
 
-      {viewMode === "kanban" ? (
-        loading ? (
-          <div className="flex gap-3 overflow-x-auto">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-64 w-[280px] min-w-[280px] animate-pulse rounded-lg bg-muted" />
-            ))}
-          </div>
-        ) : (
-          <KanbanBoard
-            conversations={filtered}
-            onCardClick={(id) => openConversation(id)}
-            onMoveCard={handleMoveCard}
-          />
-        )
-      ) : (
-        <div className="flex flex-col gap-2">
-          {loading ? (
-            Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-muted" />)
-          ) : filtered.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">Nenhuma conversa encontrada.</p>
+      <div className="flex min-h-0 flex-1 gap-0">
+        <div className="flex min-w-0 flex-1 flex-col">
+          {viewMode === "kanban" ? (
+            loading ? (
+              <div className="flex gap-3 overflow-x-auto">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-64 w-[280px] min-w-[280px] animate-pulse rounded-lg bg-muted" />
+                ))}
+              </div>
+            ) : (
+              <KanbanBoard
+                conversations={filtered}
+                onCardClick={(id) => openKanbanProfile(id)}
+                onMoveCard={handleMoveCard}
+              />
+            )
           ) : (
-            filtered.map((c) => (
-              <ConversationCard key={c?.id} conversation={c} onClick={() => openConversation(c?.id)} />
-            ))
+            <div className="flex flex-col gap-2">
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-muted" />)
+              ) : filtered.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">Nenhuma conversa encontrada.</p>
+              ) : (
+                filtered.map((c) => (
+                  <ConversationCard key={c?.id} conversation={c} onClick={() => openConversation(c?.id)} />
+                ))
+              )}
+            </div>
           )}
         </div>
-      )}
+
+        {selectedConversation && (
+          <PatientProfilePanel
+            conversation={selectedConversation}
+            onClose={() => setSelectedConversation(null)}
+            onConversationUpdate={(updated) => {
+              setConversations((prev) => prev.map((c) => (c?.id === updated.id ? updated : c)));
+              setSelectedConversation(updated);
+            }}
+          />
+        )}
+      </div>
 
       {toast && (
         <div

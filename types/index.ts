@@ -55,6 +55,8 @@ export interface Conversation {
   timeline?: TimelineEvent[];
   missingFields?: string[];
   nextAction?: string;
+  currentState?: string;
+  behaviorProfile?: string;
 }
 
 export interface Message {
