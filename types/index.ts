@@ -111,4 +111,5 @@ export interface ClinicConfig {
   pauseAiOnCompleted?: boolean;
   schedule?: WeekSchedule;
   outOfHoursMessage?: string;
+  secretaryPhone?: string;
 }

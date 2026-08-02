@@ -104,6 +104,9 @@ export default function ConfiguracoesPage() {
   const [pauseAiOnCompleted, setPauseAiOnCompleted] = useState(false);
   const [pauseAiSaving, setPauseAiSaving] = useState(false);
 
+  const [secretaryPhone, setSecretaryPhone] = useState("");
+  const [secretaryPhoneSaving, setSecretaryPhoneSaving] = useState(false);
+
   const [toast, setToast] = useState("");
 
   useEffect(() => {
@@ -115,6 +118,7 @@ export default function ConfiguracoesPage() {
         setSchedule(data?.schedule ?? DEFAULT_SCHEDULE);
         setOutOfHoursMessage(data?.outOfHoursMessage ?? DEFAULT_OUT_OF_HOURS_MESSAGE);
         setPauseAiOnCompleted(data?.pauseAiOnCompleted ?? false);
+        setSecretaryPhone(data?.secretaryPhone ?? "");
       })
       .catch((err) => setError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
@@ -169,6 +173,18 @@ export default function ConfiguracoesPage() {
       showToast(getApiErrorMessage(err));
     } finally {
       setMessageSaving(false);
+    }
+  }
+
+  async function handleSaveSecretaryPhone() {
+    setSecretaryPhoneSaving(true);
+    try {
+      await configApi.updateConfig({ secretaryPhone });
+      showToast("Telefone da secretaria salvo com sucesso.");
+    } catch (err) {
+      showToast(getApiErrorMessage(err));
+    } finally {
+      setSecretaryPhoneSaving(false);
     }
   }
 
@@ -299,15 +315,38 @@ export default function ConfiguracoesPage() {
               <CardHeader>
                 <CardTitle>Dados da clinica</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
-                <Field label="Nome da clinica" value={config.clinicName} onChange={(v) => updateField("clinicName", v)} />
-                <Field label="E-mail" value={config.email} onChange={(v) => updateField("email", v)} />
-                <Field label="Telefone Vicosa" value={config.phoneVicosa} onChange={(v) => updateField("phoneVicosa", v)} />
-                <Field
-                  label="Telefone Florianopolis"
-                  value={config.phoneFlorianopolis}
-                  onChange={(v) => updateField("phoneFlorianopolis", v)}
-                />
+              <CardContent className="flex flex-col gap-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Nome da clinica" value={config.clinicName} onChange={(v) => updateField("clinicName", v)} />
+                  <Field label="E-mail" value={config.email} onChange={(v) => updateField("email", v)} />
+                  <Field label="Telefone Vicosa" value={config.phoneVicosa} onChange={(v) => updateField("phoneVicosa", v)} />
+                  <Field
+                    label="Telefone Florianopolis"
+                    value={config.phoneFlorianopolis}
+                    onChange={(v) => updateField("phoneFlorianopolis", v)}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5 border-t border-border pt-4">
+                  <label className="text-sm font-medium text-primary">
+                    Telefone da secretaria (notificacoes)
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={secretaryPhone}
+                      onChange={(e) => setSecretaryPhone(e.target.value)}
+                      placeholder="5571999999999"
+                      className="max-w-xs"
+                    />
+                    <Button size="sm" onClick={handleSaveSecretaryPhone} disabled={secretaryPhoneSaving}>
+                      {secretaryPhoneSaving ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    A secretaria recebera notificacoes no WhatsApp quando houver escaladas ou agendamentos pendentes.
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
