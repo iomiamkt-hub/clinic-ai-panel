@@ -7,6 +7,7 @@ import {
   truncate,
 } from "@/lib/conversation";
 import { cn } from "@/lib/utils";
+import { StageMiniBar } from "@/components/conversations/ProgressCard";
 import type { Conversation } from "@/types";
 
 interface KanbanCardProps {
@@ -102,6 +103,12 @@ export function KanbanCard({ conversation, onClick, onDragStart, onDragEnd }: Ka
           {timeLabel}
         </span>
       )}
+
+      {/* Stage mini bar */}
+      <StageMiniBar
+        stage={conversation?.currentState ?? conversation?.stage}
+        missingCount={missing.length}
+      />
 
       {/* Badges de indicadores */}
       <div className="flex flex-wrap gap-1 pt-0.5">

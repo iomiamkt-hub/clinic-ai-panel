@@ -14,6 +14,7 @@ import { conversationsApi, getApiErrorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { FUNNEL_STAGES, formatPhone, getFunnelBadge } from "@/lib/conversation";
 import { MessageHistory } from "@/components/conversations/MessageHistory";
+import { ProgressCard } from "@/components/conversations/ProgressCard";
 import type { Conversation, Message, TimelineEvent } from "@/types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -491,6 +492,13 @@ export function ConversationFullView({ conversationId }: ConversationFullViewPro
         {/* ── Coluna direita: painel do paciente ── */}
         <div className="flex w-[35%] flex-col gap-0 overflow-y-auto scrollbar-thin">
           <div className="flex flex-col gap-5 px-6 py-5">
+
+            {/* 0. Progress Card da IA */}
+            <ProgressCard
+              conversationId={conversationId}
+              patientName={conversation?.patient?.name ?? conversation?.patient?.phone}
+              currentState={conversation?.currentState}
+            />
 
             {/* 1. Dados do paciente */}
             <section className="flex flex-col gap-2">
