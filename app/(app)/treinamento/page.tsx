@@ -1,17 +1,15 @@
 import { Header } from "@/components/layout/Header";
-import { PromptEditor } from "@/components/training/PromptEditor";
-import { ExamplesList } from "@/components/training/ExamplesList";
-import { ChatPreview } from "@/components/training/ChatPreview";
+import { BehaviorEditor } from "@/components/training/BehaviorEditor";
 import { LorenaFlowchart } from "@/components/flowchart/LorenaFlowchart";
+import { ChatPreview } from "@/components/training/ChatPreview";
 
 export default function TreinamentoPage() {
   return (
     <div className="flex flex-col">
-      <Header title="Treinamento" description="Ajuste o comportamento e as respostas da Lorena" />
+      <Header title="Treinamento" description="Configure o comportamento e a identidade da Lorena" />
       <div className="flex flex-col gap-6 p-8">
-        <PromptEditor />
+        <BehaviorEditor />
         <LorenaFlowchart />
-        <ExamplesList />
         <ChatPreview />
       </div>
     </div>
