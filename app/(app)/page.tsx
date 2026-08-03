@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -13,6 +14,7 @@ import {
   RefreshCw, TrendingUp, Users,
 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
+import { PriorityCenter } from "@/components/dashboard/PriorityCenter";
 import { cn } from "@/lib/utils";
 
 // ── Palette ───────────────────────────────────────────────────────────────────
@@ -382,6 +384,9 @@ function TabOperacional({ refresh }: { refresh: number }) {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Centro de Prioridades */}
+      <PriorityCenter />
+
       {/* Situação atual */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <KpiCard loading={loading} title="Conversas em andamento" value={ops?.active ?? 0} icon={MessageSquare} accent="blue" />
@@ -652,10 +657,26 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "comercial", label: "Comercial" },
 ];
 
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 export default function DashboardPage() {
+  const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<TabKey>("executivo");
   const [refreshTick, setRefreshTick] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<string>("");
+  const [clock, setClock] = useState<string>(() => format(new Date(), "HH:mm", { locale: ptBR }));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setClock(format(new Date(), "HH:mm", { locale: ptBR }));
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Auto-refresh every 60 s
   useEffect(() => {
@@ -677,6 +698,24 @@ export default function DashboardPage() {
       <Header title="Dashboard" description="Visão geral do atendimento da clínica" />
 
       <div className="flex flex-col gap-6 p-6">
+        {/* Banner de boas-vindas */}
+        <div className="flex items-center justify-between rounded-2xl border border-border bg-gradient-to-r from-primary to-primary/80 px-6 py-4 text-white shadow-sm">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-base font-bold">
+              {greeting()}, {session?.user?.name?.split(" ")[0] ?? "Usuário"}!
+            </span>
+            <span className="text-xs text-white/70">
+              Aqui está o resumo do seu atendimento.
+            </span>
+          </div>
+          <div className="flex flex-col items-end gap-0.5">
+            <span className="text-2xl font-bold tabular-nums">{clock}</span>
+            <span className="text-[11px] text-white/60">
+              {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+            </span>
+          </div>
+        </div>
+
         {/* Tab bar + timestamp */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex gap-1 rounded-xl border border-border bg-white p-1 shadow-sm">
