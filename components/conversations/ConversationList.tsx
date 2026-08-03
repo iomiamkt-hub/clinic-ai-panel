@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { List, LayoutGrid } from "lucide-react";
+import { List, LayoutGrid, Search } from "lucide-react";
 import { ConversationCard } from "@/components/conversations/ConversationCard";
 import { KanbanBoard } from "@/components/conversations/KanbanBoard";
 import { PatientProfilePanel } from "@/components/conversations/PatientProfilePanel";
 import { Select } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { conversationsApi, getApiErrorMessage } from "@/lib/api";
 import { FUNNEL_STAGES, STAGE_PATCH_VALUE, getFunnelKey, type FunnelKey } from "@/lib/conversation";
 import { cn } from "@/lib/utils";
@@ -14,9 +15,33 @@ import type { Conversation } from "@/types";
 
 type ViewMode = "list" | "kanban";
 type StageFilter = FunnelKey | "ALL" | "AI_PAUSED";
+type StatusFilter = "ALL" | "ACTIVE" | "WAITING_HUMAN" | "COMPLETED";
+type PeriodFilter = "ALL" | "TODAY" | "WEEK" | "MONTH";
 
 const VIEW_MODE_KEY = "conversas-view-mode";
 const STAGE_FILTER_KEY = "conversas-stage-filter";
+
+function isToday(dateStr?: string | null) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
+
+function isThisWeek(dateStr?: string | null) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const now = new Date();
+  const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+  return d >= weekAgo;
+}
+
+function isThisMonth(dateStr?: string | null) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+}
 
 export function ConversationList() {
   const router = useRouter();
@@ -24,6 +49,9 @@ export function ConversationList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [stageFilter, setStageFilter] = useState<StageFilter>("ALL");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" } | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -141,70 +169,106 @@ export function ConversationList() {
   }, [conversations]);
 
   const filtered = useMemo(() => {
-    if (stageFilter === "ALL") return conversations;
-    if (stageFilter === "AI_PAUSED") return conversations.filter((c) => c?.aiEnabled === false);
-    return conversations.filter((c) => getFunnelKey(c) === stageFilter);
-  }, [conversations, stageFilter]);
+    let list = conversations;
+    // search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((c) => {
+        const name = (c?.patient?.name ?? "").toLowerCase();
+        const phone = (c?.patient?.phone ?? "").replace(/\D/g, "");
+        return name.includes(q) || phone.includes(q.replace(/\D/g, ""));
+      });
+    }
+    // stage
+    if (stageFilter === "AI_PAUSED") list = list.filter((c) => c?.aiEnabled === false);
+    else if (stageFilter !== "ALL") list = list.filter((c) => getFunnelKey(c) === stageFilter);
+    // status
+    if (statusFilter !== "ALL") list = list.filter((c) => c?.status === statusFilter);
+    // period
+    if (periodFilter === "TODAY") list = list.filter((c) => isToday(c?.updatedAt ?? c?.createdAt));
+    else if (periodFilter === "WEEK") list = list.filter((c) => isThisWeek(c?.updatedAt ?? c?.createdAt));
+    else if (periodFilter === "MONTH") list = list.filter((c) => isThisMonth(c?.updatedAt ?? c?.createdAt));
+    return list;
+  }, [conversations, stageFilter, statusFilter, periodFilter, searchQuery]);
+
+  const summaryActive = conversations.filter((c) => c?.status === "ACTIVE").length;
+  const summaryBooked = conversations.filter((c) => c?.stage === "COMPLETED").length;
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => changeViewMode("list")}
-          className={cn(
-            "flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
-            viewMode === "list"
-              ? "border-secondary bg-secondary text-white"
-              : "border-border bg-white text-muted-foreground",
-          )}
-        >
-          <List className="h-3.5 w-3.5" />
-          Lista
-        </button>
-        <button
-          onClick={() => changeViewMode("kanban")}
-          className={cn(
-            "flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
-            viewMode === "kanban"
-              ? "border-secondary bg-secondary text-white"
-              : "border-border bg-white text-muted-foreground",
-          )}
-        >
-          <LayoutGrid className="h-3.5 w-3.5" />
-          Kanban
-        </button>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {FUNNEL_STAGES.map((stage) => (
+      {/* Header row 1: title + summary */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-primary">Conversas</h1>
+          <p className="text-xs text-muted-foreground">
+            {conversations.length} leads · {summaryActive} ativos · {summaryBooked} agendados
+          </p>
+        </div>
+        {/* View toggle */}
+        <div className="flex gap-1 rounded-lg border border-border bg-white p-1">
           <button
-            key={stage.key}
-            onClick={() => changeStageFilter(stageFilter === stage.key ? "ALL" : stage.key)}
+            onClick={() => changeViewMode("list")}
             className={cn(
-              "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-              stage.className,
-              stageFilter === stage.key && "ring-2 ring-offset-1 ring-primary",
+              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+              viewMode === "list" ? "bg-secondary text-white" : "text-muted-foreground hover:bg-muted",
             )}
           >
-            {stage.label}: {counts.get(stage.key) ?? 0}
+            <List className="h-3.5 w-3.5" /> Lista
           </button>
-        ))}
+          <button
+            onClick={() => changeViewMode("kanban")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+              viewMode === "kanban" ? "bg-secondary text-white" : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" /> Kanban
+          </button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <Select
-          value={stageFilter}
-          onChange={(e) => changeStageFilter(e.target.value as StageFilter)}
-          className="w-56"
-        >
-          <option value="ALL">Todos</option>
-          {FUNNEL_STAGES.map((stage) => (
-            <option key={stage.key} value={stage.key}>
-              {stage.label}
-            </option>
+      {/* Header row 2: filter bar */}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-white px-4 py-3 shadow-sm">
+        {/* Search */}
+        <div className="relative min-w-[180px] flex-1">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar nome ou telefone..."
+            className="h-8 pl-8 text-xs"
+          />
+        </div>
+
+        {/* Status */}
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)} className="h-8 w-44 text-xs">
+          <option value="ALL">Todos os status</option>
+          <option value="ACTIVE">Ativo</option>
+          <option value="WAITING_HUMAN">Aguardando secretária</option>
+          <option value="COMPLETED">Concluído</option>
+        </Select>
+
+        {/* Stage */}
+        <Select value={stageFilter} onChange={(e) => changeStageFilter(e.target.value as StageFilter)} className="h-8 w-44 text-xs">
+          <option value="ALL">Todas as etapas</option>
+          {FUNNEL_STAGES.map((s) => (
+            <option key={s.key} value={s.key}>{s.label}</option>
           ))}
           <option value="AI_PAUSED">IA pausada</option>
         </Select>
+
+        {/* Period */}
+        <Select value={periodFilter} onChange={(e) => setPeriodFilter(e.target.value as PeriodFilter)} className="h-8 w-36 text-xs">
+          <option value="ALL">Todo período</option>
+          <option value="TODAY">Hoje</option>
+          <option value="WEEK">Esta semana</option>
+          <option value="MONTH">Este mês</option>
+        </Select>
+
+        {/* Count chip */}
+        <span className="shrink-0 rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
+          {filtered.length} resultado{filtered.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
       {error && <div className="rounded-md bg-danger/10 px-4 py-3 text-sm text-danger">{error}</div>}

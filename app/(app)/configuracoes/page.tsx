@@ -385,6 +385,22 @@ export default function ConfiguracoesPage() {
           </>
         ) : null}
 
+        {/* Kanban config link */}
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle>Fluxo Kanban</CardTitle>
+            <a
+              href="/configuracoes/kanban"
+              className="rounded-lg border border-border bg-white px-4 py-2 text-xs font-semibold text-primary shadow-sm transition-colors hover:bg-muted"
+            >
+              Configurar Kanban →
+            </a>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">Personalize as colunas do kanban: crie, renomeie, reordene ou oculte etapas.</p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Usuarios do painel</CardTitle>
