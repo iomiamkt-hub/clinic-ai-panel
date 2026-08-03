@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/select";
 import { conversationsApi, getApiErrorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { FUNNEL_STAGES, formatPhone, getFunnelBadge } from "@/lib/conversation";
+import { MessageHistory } from "@/components/conversations/MessageHistory";
 import type { Conversation, Message, TimelineEvent } from "@/types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -72,11 +73,6 @@ function getTimelineDotColor(event: string): string {
   return "bg-blue-400";
 }
 
-const senderConfig: Record<Message["sender"], { label: string | null; bubble: string; align: string }> = {
-  PATIENT: { label: null, bubble: "bg-secondary text-white", align: "self-end items-end" },
-  LORENA:  { label: "Lorena", bubble: "bg-primary text-white", align: "self-start items-start" },
-  HUMAN:   { label: "Secretaria", bubble: "bg-[#6B7280] text-white", align: "self-start items-start" },
-};
 
 const TAG_COLORS = [
   "bg-sky-100 text-sky-700",
@@ -400,23 +396,15 @@ export function ConversationFullView({ conversationId }: ConversationFullViewPro
               <div className="flex-1 overflow-y-auto bg-muted/30 px-6 py-4 scrollbar-thin">
                 {loading ? (
                   <p className="text-center text-sm text-muted-foreground">Carregando historico...</p>
-                ) : (messages ?? []).length === 0 ? (
-                  <p className="text-center text-sm text-muted-foreground">Nenhuma mensagem ainda.</p>
                 ) : (
-                  <div className="flex flex-col gap-3">
-                    {(messages ?? []).map((msg) => {
-                      const cfg = senderConfig[msg?.sender] ?? senderConfig.PATIENT;
-                      return (
-                        <div key={msg?.id ?? Math.random()} className={cn("flex max-w-[80%] flex-col gap-0.5", cfg.align)}>
-                          {cfg.label && <span className="px-1 text-[10px] font-medium text-muted-foreground">{cfg.label}</span>}
-                          <div className={cn("rounded-lg px-3 py-2 text-sm", cfg.bubble)}>
-                            <p>{msg?.content ?? ""}</p>
-                            <p className="mt-1 text-[10px] text-white/70">{formatDate(msg?.createdAt, "dd/MM HH:mm")}</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <MessageHistory
+                    messages={messages ?? []}
+                    conversation={conversation}
+                    aiEnabled={aiEnabled}
+                    onSaveAsNote={(text) => {
+                      setNotes((prev) => prev ? `${prev}\n\n${text}` : text);
+                    }}
+                  />
                 )}
               </div>
 
