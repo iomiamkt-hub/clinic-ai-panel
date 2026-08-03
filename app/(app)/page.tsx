@@ -54,22 +54,52 @@ function toChartArray(raw: unknown): { name: string; value: number }[] {
   return [];
 }
 
+// Map English funnel keys/labels → Portuguese display labels
+const FUNNEL_PT: Record<string, string> = {
+  total:        "Leads iniciados",
+  leads:        "Leads iniciados",
+  started:      "Iniciaram",
+  responded:    "Responderam",
+  chose:        "Escolheram horário",
+  completed:    "Avançaram",
+  confirmed:    "Confirmaram",
+  booked:       "Agendados",
+  conversion:   "Conversão",
+  messages:     "Mensagens",
+  conversations:"Conversas",
+  appointments: "Agendamentos",
+  active:       "Ativo",
+  pending:      "Pendente",
+  waiting:      "Aguardando",
+  escalated:    "Escalado",
+  states:       "Estados",
+  actions:      "Ações",
+  reasons:      "Motivos",
+};
+
+function ptLabel(raw: string): string {
+  const key = raw.toLowerCase().trim();
+  return FUNNEL_PT[key] ?? raw;
+}
+
 // Convert funnel: accepts array or object with known keys
 function toFunnelArray(raw: unknown): { label: string; value: number }[] {
   if (!raw) return [];
   if (Array.isArray(raw)) {
     return raw.map((item) => {
       const o = (item ?? {}) as Record<string, unknown>;
-      return { label: String(o.label ?? o.name ?? ""), value: Number(o.value ?? o.count ?? 0) };
+      const rawLabel = String(o.label ?? o.name ?? o.key ?? "");
+      return { label: ptLabel(rawLabel), value: Number(o.value ?? o.count ?? 0) };
     });
   }
   if (typeof raw === "object") {
     const o = raw as Record<string, unknown>;
-    // Known keys the backend might use
     const KEYS = [
       { k: "total",     label: "Leads iniciados" },
+      { k: "leads",     label: "Leads iniciados" },
       { k: "responded", label: "Responderam" },
       { k: "chose",     label: "Escolheram horário" },
+      { k: "completed", label: "Avançaram" },
       { k: "confirmed", label: "Confirmaram" },
       { k: "booked",    label: "Agendados" },
     ];
@@ -78,10 +108,20 @@ function toFunnelArray(raw: unknown): { label: string; value: number }[] {
       value: Number(o[k]) || 0,
     }));
     if (mapped.length) return mapped;
-    // Fallback: treat every key as a step
-    return Object.entries(o).map(([k, v]) => ({ label: k, value: Number(v) || 0 }));
+    // Fallback: translate every key
+    return Object.entries(o).map(([k, v]) => ({ label: ptLabel(k), value: Number(v) || 0 }));
   }
   return [];
+}
+
+// Normalize messagesLast7Days — API may use count, mensagens, total, value
+function normalizeDays(raw: unknown[]): { date: string; count: number }[] {
+  return raw.map((item) => {
+    const o = (item ?? {}) as Record<string, unknown>;
+    const count = Number(o.count ?? o.mensagens ?? o.total ?? o.value ?? 0);
+    const date = String(o.date ?? o.dia ?? o.day ?? "");
+    return { date, count };
+  });
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -203,7 +243,7 @@ function TabExecutivo({ refresh }: { refresh: number }) {
       apiFetch<unknown>("/api/metrics/funnel", []),
     ]);
     const raw = (s ?? {}) as Record<string, unknown>;
-    const days = Array.isArray(raw.messagesLast7Days) ? raw.messagesLast7Days as { date: string; count: number }[] : [];
+    const days = Array.isArray(raw.messagesLast7Days) ? normalizeDays(raw.messagesLast7Days) : [];
     setSummary({
       messagesToday: Number(raw.messagesToday ?? 0),
       activeConversations: Number(raw.activeConversations ?? 0),
@@ -265,10 +305,10 @@ function TabExecutivo({ refresh }: { refresh: number }) {
           {loading ? <Skeleton h={240} /> : (
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#6b7280" }} />
+                <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} />
+                <Tooltip contentStyle={{ background: "#1A2332", color: "#fff", border: "none", borderRadius: 8, fontSize: 12 }} />
                 <Bar dataKey="count" name="Mensagens" fill="#FF6B00" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -483,7 +523,7 @@ function TabIA({ refresh }: { refresh: number }) {
                 <Pie data={ai!.escalationReasons} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
                   {ai!.escalationReasons.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={{ background: "#1A2332", color: "#fff", border: "none", borderRadius: 8, fontSize: 12 }} />
               </PieChart>
             </ResponsiveContainer>
           )}
@@ -496,10 +536,10 @@ function TabIA({ refresh }: { refresh: number }) {
           ) : (
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={ai!.nextActions.map((a) => ({ ...a, name: ACTION_LABELS[a.name] ?? a.name }))} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={130} />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10, fill: "#6b7280" }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#6b7280" }} width={130} />
+                <Tooltip contentStyle={{ background: "#1A2332", color: "#fff", border: "none", borderRadius: 8, fontSize: 12 }} />
                 <Bar dataKey="value" name="Execuções" fill="#1A2332" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -571,7 +611,7 @@ function TabComercial({ refresh }: { refresh: number }) {
                 <Pie data={com!.byInsurance} cx="50%" cy="50%" outerRadius={90} dataKey="value" nameKey="name">
                   {com!.byInsurance.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={{ background: "#1A2332", color: "#fff", border: "none", borderRadius: 8, fontSize: 12 }} />
                 <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
               </PieChart>
             </ResponsiveContainer>
@@ -585,10 +625,10 @@ function TabComercial({ refresh }: { refresh: number }) {
           ) : (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={com!.byUnit} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#6b7280" }} />
+                <YAxis tick={{ fontSize: 11, fill: "#6b7280" }} />
+                <Tooltip contentStyle={{ background: "#1A2332", color: "#fff", border: "none", borderRadius: 8, fontSize: 12 }} />
                 <Bar dataKey="value" name="Pacientes" radius={[4, 4, 0, 0]}>
                   {com!.byUnit.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Bar>
