@@ -31,6 +31,59 @@ async function apiFetch<T>(path: string, fallback: T): Promise<T> {
   }
 }
 
+// Convert any API response shape into { name, value }[] for charts
+function toChartArray(raw: unknown): { name: string; value: number }[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.map((item) => {
+      if (item && typeof item === "object") {
+        const o = item as Record<string, unknown>;
+        const name = String(o.name ?? o.label ?? o.key ?? "");
+        const value = Number(o.value ?? o.count ?? 0);
+        return { name, value };
+      }
+      return { name: String(item), value: 0 };
+    });
+  }
+  if (typeof raw === "object") {
+    return Object.entries(raw as Record<string, unknown>).map(([k, v]) => ({
+      name: k,
+      value: Number(v) || 0,
+    }));
+  }
+  return [];
+}
+
+// Convert funnel: accepts array or object with known keys
+function toFunnelArray(raw: unknown): { label: string; value: number }[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.map((item) => {
+      const o = (item ?? {}) as Record<string, unknown>;
+      return { label: String(o.label ?? o.name ?? ""), value: Number(o.value ?? o.count ?? 0) };
+    });
+  }
+  if (typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    // Known keys the backend might use
+    const KEYS = [
+      { k: "total",     label: "Leads iniciados" },
+      { k: "responded", label: "Responderam" },
+      { k: "chose",     label: "Escolheram horário" },
+      { k: "confirmed", label: "Confirmaram" },
+      { k: "booked",    label: "Agendados" },
+    ];
+    const mapped = KEYS.filter(({ k }) => k in o).map(({ k, label }) => ({
+      label: String(o[`${k}Label`] ?? label),
+      value: Number(o[k]) || 0,
+    }));
+    if (mapped.length) return mapped;
+    // Fallback: treat every key as a step
+    return Object.entries(o).map(([k, v]) => ({ label: k, value: Number(v) || 0 }));
+  }
+  return [];
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Summary {
@@ -146,22 +199,31 @@ function TabExecutivo({ refresh }: { refresh: number }) {
 
   const load = useCallback(async () => {
     const [s, f] = await Promise.all([
-      apiFetch<Summary>("/api/metrics/summary", {
-        messagesToday: 0, activeConversations: 0, confirmedAppointments: 0,
-        escalatedToHuman: 0, completedToday: 0, waitingHumanToday: 0,
-        pendingAppointments: 0, awaitingReturn: 0, conversionRate: 0,
-        avgTimeToAppointment: null, messagesLast7Days: [],
-      }),
-      apiFetch<FunnelStep[]>("/api/metrics/funnel", []),
+      apiFetch<unknown>("/api/metrics/summary", {}),
+      apiFetch<unknown>("/api/metrics/funnel", []),
     ]);
-    setSummary(s);
-    setFunnel(f);
+    const raw = (s ?? {}) as Record<string, unknown>;
+    const days = Array.isArray(raw.messagesLast7Days) ? raw.messagesLast7Days as { date: string; count: number }[] : [];
+    setSummary({
+      messagesToday: Number(raw.messagesToday ?? 0),
+      activeConversations: Number(raw.activeConversations ?? 0),
+      confirmedAppointments: Number(raw.confirmedAppointments ?? 0),
+      escalatedToHuman: Number(raw.escalatedToHuman ?? 0),
+      completedToday: Number(raw.completedToday ?? 0),
+      waitingHumanToday: Number(raw.waitingHumanToday ?? 0),
+      pendingAppointments: Number(raw.pendingAppointments ?? 0),
+      awaitingReturn: Number(raw.awaitingReturn ?? 0),
+      conversionRate: Number(raw.conversionRate ?? 0),
+      avgTimeToAppointment: raw.avgTimeToAppointment != null ? Number(raw.avgTimeToAppointment) : null,
+      messagesLast7Days: days,
+    });
+    setFunnel(toFunnelArray(f));
     setLoading(false);
   }, []);
 
   useEffect(() => { setLoading(true); load(); }, [load, refresh]);
 
-  const chartData = (summary?.messagesLast7Days ?? []).map((d) => ({
+  const chartData = (Array.isArray(summary?.messagesLast7Days) ? summary!.messagesLast7Days : []).map((d) => ({
     ...d, label: fmtDate(d.date),
   }));
 
@@ -258,19 +320,20 @@ function TabOperacional({ refresh }: { refresh: number }) {
 
   const load = useCallback(async () => {
     const [w, t, o] = await Promise.all([
-      apiFetch<WaitingPatient[]>("/api/metrics/waiting", []),
-      apiFetch<TimelineItem[]>("/api/metrics/timeline-today", []),
-      apiFetch("/api/metrics/summary", null) as Promise<Record<string, number> | null>,
+      apiFetch<unknown>("/api/metrics/waiting", []),
+      apiFetch<unknown>("/api/metrics/timeline-today", []),
+      apiFetch<unknown>("/api/metrics/summary", {}),
     ]);
-    setWaiting(w);
-    setTimeline(t);
-    if (o) setOps({
-      active: (o.activeConversations as number) ?? 0,
-      waitingReply: (o.waitingReply as number) ?? 0,
-      aiWaiting: (o.aiWaiting as number) ?? 0,
-      urgencias: (o.urgencias as number) ?? 0,
-      pendingAppt: (o.pendingAppointments as number) ?? 0,
-      escalated: (o.escalatedToHuman as number) ?? 0,
+    setWaiting(Array.isArray(w) ? w as WaitingPatient[] : []);
+    setTimeline(Array.isArray(t) ? t as TimelineItem[] : []);
+    const raw = (o ?? {}) as Record<string, unknown>;
+    setOps({
+      active: Number(raw.activeConversations ?? 0),
+      waitingReply: Number(raw.waitingReply ?? 0),
+      aiWaiting: Number(raw.aiWaiting ?? 0),
+      urgencias: Number(raw.urgencias ?? 0),
+      pendingAppt: Number(raw.pendingAppointments ?? 0),
+      escalated: Number(raw.escalatedToHuman ?? 0),
     });
     setLoading(false);
   }, []);
@@ -355,20 +418,29 @@ function TabIA({ refresh }: { refresh: number }) {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const [summary, reasons, actions, states] = await Promise.all([
-      apiFetch<Record<string, unknown>>("/api/metrics/summary", {}),
-      apiFetch<{ name: string; value: number }[]>("/api/metrics/escalation-reasons", []),
-      apiFetch<{ name: string; value: number }[]>("/api/metrics/decision-engine", []),
-      apiFetch<{ name: string; value: number }[]>("/api/metrics/states", []),
+    const [summary, reasons, engine, states] = await Promise.all([
+      apiFetch<unknown>("/api/metrics/summary", {}),
+      apiFetch<unknown>("/api/metrics/escalation-reasons", []),
+      apiFetch<unknown>("/api/metrics/decision-engine", []),
+      apiFetch<unknown>("/api/metrics/states", []),
     ]);
+    const raw = (summary ?? {}) as Record<string, unknown>;
+    // decision-engine may return { actions: {…}, states: {…} } or a flat array
+    let actionsRaw: unknown = engine;
+    let statesRaw: unknown = states;
+    if (engine && !Array.isArray(engine) && typeof engine === "object") {
+      const eng = engine as Record<string, unknown>;
+      if (eng.actions) actionsRaw = eng.actions;
+      if (eng.states) statesRaw = eng.states;
+    }
     setAi({
-      completedNoHuman: (summary.completedNoHuman as number) ?? 0,
-      escalated: (summary.escalatedToHuman as number) ?? 0,
-      autoCompletionRate: (summary.autoCompletionRate as number) ?? 0,
-      fieldsCollected: (summary.fieldsCollected as number) ?? 0,
-      escalationReasons: reasons,
-      nextActions: actions,
-      states,
+      completedNoHuman: Number(raw.completedNoHuman ?? 0),
+      escalated: Number(raw.escalatedToHuman ?? 0),
+      autoCompletionRate: Number(raw.autoCompletionRate ?? 0),
+      fieldsCollected: Number(raw.fieldsCollected ?? 0),
+      escalationReasons: toChartArray(reasons),
+      nextActions: toChartArray(actionsRaw),
+      states: toChartArray(statesRaw),
     });
     setLoading(false);
   }, []);
@@ -462,16 +534,17 @@ function TabComercial({ refresh }: { refresh: number }) {
 
   const load = useCallback(async () => {
     const [ins, unit, summary] = await Promise.all([
-      apiFetch<{ name: string; value: number }[]>("/api/metrics/by-insurance", []),
-      apiFetch<{ name: string; value: number }[]>("/api/metrics/by-unit", []),
-      apiFetch<Record<string, unknown>>("/api/metrics/summary", {}),
+      apiFetch<unknown>("/api/metrics/by-insurance", []),
+      apiFetch<unknown>("/api/metrics/by-unit", []),
+      apiFetch<unknown>("/api/metrics/summary", {}),
     ]);
+    const raw = (summary ?? {}) as Record<string, unknown>;
     setCom({
-      byInsurance: ins,
-      byUnit: unit,
-      avgAiResponseMin: (summary.avgAiResponseMin as number) ?? null,
-      avgTimeToBookMin: (summary.avgTimeToBookMin as number) ?? null,
-      avgFullAttendanceMin: (summary.avgFullAttendanceMin as number) ?? null,
+      byInsurance: toChartArray(ins),
+      byUnit: toChartArray(unit),
+      avgAiResponseMin: raw.avgAiResponseMin != null ? Number(raw.avgAiResponseMin) : null,
+      avgTimeToBookMin: raw.avgTimeToBookMin != null ? Number(raw.avgTimeToBookMin) : null,
+      avgFullAttendanceMin: raw.avgFullAttendanceMin != null ? Number(raw.avgFullAttendanceMin) : null,
     });
     setLoading(false);
   }, []);
