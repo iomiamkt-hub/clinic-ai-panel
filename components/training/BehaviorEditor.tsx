@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Info, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +56,7 @@ const DEFAULT_CONFIG: BehaviorConfig = {
   mensagensCurtas: true,
   nuncaInformarValores: false,
   encaminharUrgencias: true,
-  perguntarConvenio: true,
+  perguntarConvenio: false,
   conhecimento: "",
   restricoes: [
     "Nunca emitir diagnóstico médico",
@@ -64,6 +64,91 @@ const DEFAULT_CONFIG: BehaviorConfig = {
     "Nunca alterar agendamento sem confirmação",
   ],
 };
+
+// ── Parse API response → BehaviorConfig ───────────────────────────────────────
+// Handles both the flat legacy shape and the nested shape the new backend returns.
+
+function parseApiResponse(data: Record<string, unknown>): Partial<BehaviorConfig> {
+  const parsed: Partial<BehaviorConfig> = {};
+
+  // ── Identidade ──────────────────────────────────────────────────────────────
+  const ident = (data.personalidade as Record<string, unknown> | undefined) ?? data;
+  parsed.nomeIA           = String(ident.nomeIA ?? data.nomeIA ?? DEFAULT_CONFIG.nomeIA);
+  parsed.personalidade    = String(ident.personalidade ?? data.personalidade ?? "");
+  parsed.usarEmojis       = Boolean(ident.usarEmojis ?? data.usarEmojis ?? true);
+  parsed.tratamentoInformal = Boolean(ident.tratamentoInformal ?? data.tratamentoInformal ?? true);
+  parsed.tratamentoFormal   = Boolean(ident.tratamentoFormal ?? data.tratamentoFormal ?? false);
+
+  // ── Clínica ─────────────────────────────────────────────────────────────────
+  const info = (data.informacoesClinica as Record<string, unknown> | undefined) ?? data;
+  parsed.nomeClinica       = String(info.nomeClinica ?? data.nomeClinica ?? "");
+  parsed.medicoResponsavel = String(info.medicoResponsavel ?? data.medicoResponsavel ?? "");
+  parsed.especialidade     = String(info.especialidade ?? data.especialidade ?? "");
+  parsed.unidades          = (Array.isArray(info.unidades ?? data.unidades) ? (info.unidades ?? data.unidades) : []) as Unidade[];
+  parsed.convenios         = (Array.isArray(info.convenios ?? data.convenios) ? (info.convenios ?? data.convenios) : []) as string[];
+
+  // ── Regras ──────────────────────────────────────────────────────────────────
+  // Backend may return nested `rules` or `regrasAtendimento`, or flat fields.
+  const rules = (
+    (data.regrasAtendimento as Record<string, unknown> | undefined) ??
+    (data.rules as Record<string, unknown> | undefined) ??
+    data
+  );
+  parsed.confirmarAgendamento  = Boolean(rules.confirmarAgendamento ?? data.confirmarAgendamento ?? true);
+  parsed.mensagensCurtas       = Boolean(rules.mensagensCurtas ?? data.mensagensCurtas ?? true);
+  parsed.nuncaInformarValores  = Boolean(rules.nuncaInformarValores ?? data.nuncaInformarValores ?? false);
+  parsed.encaminharUrgencias   = Boolean(rules.encaminharUrgencias ?? data.encaminharUrgencias ?? true);
+  // New canonical field name from backend; fallback to old flat name
+  parsed.perguntarConvenio = Boolean(
+    rules.askInsuranceBeforeAvailability ??
+    rules.perguntarConvenio ??
+    data.perguntarConvenio ??
+    false,
+  );
+
+  // ── Conhecimento / Restrições ────────────────────────────────────────────────
+  parsed.conhecimento = String(data.conhecimento ?? "");
+  parsed.restricoes   = Array.isArray(data.restricoes) ? (data.restricoes as string[]) : DEFAULT_CONFIG.restricoes;
+
+  return parsed;
+}
+
+// ── Build structured payload for POST /api/config/clinic ─────────────────────
+// Matches the new backend contract: nested objects per section.
+
+function buildPayload(config: BehaviorConfig) {
+  return {
+    // Keep flat fields at top-level for backward compat with old backend
+    ...config,
+    // Also send the structured nested shape the new backend now reads
+    personalidade: {
+      nomeIA:             config.nomeIA,
+      personalidade:      config.personalidade,
+      usarEmojis:         config.usarEmojis,
+      tratamentoInformal: config.tratamentoInformal,
+      tratamentoFormal:   config.tratamentoFormal,
+    },
+    informacoesClinica: {
+      nomeClinica:       config.nomeClinica,
+      medicoResponsavel: config.medicoResponsavel,
+      especialidade:     config.especialidade,
+      unidades:          config.unidades,
+      convenios:         config.convenios,
+    },
+    regrasAtendimento: {
+      confirmarAgendamento:           config.confirmarAgendamento,
+      mensagensCurtas:                config.mensagensCurtas,
+      nuncaInformarValores:           config.nuncaInformarValores,
+      encaminharUrgencias:            config.encaminharUrgencias,
+      // Use the canonical backend field name
+      askInsuranceBeforeAvailability: config.perguntarConvenio,
+      // Keep old name as alias for backend compatibility
+      perguntarConvenio:              config.perguntarConvenio,
+    },
+    conhecimento: config.conhecimento,
+    restricoes:   config.restricoes,
+  };
+}
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
 
@@ -128,18 +213,22 @@ export function BehaviorEditor() {
   const [newConvenio, setNewConvenio] = useState("");
   // Restrições
   const [newRestricao, setNewRestricao] = useState("");
-  // Preview
+  // Prompt preview
   const [showPrompt, setShowPrompt] = useState(false);
   const [promptText, setPromptText] = useState("");
   const [loadingPrompt, setLoadingPrompt] = useState(false);
 
-  // Load saved config on mount
+  // ── Load config on mount ───────────────────────────────────────────────────
+
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/config/clinic`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data && typeof data === "object") {
-          setConfig((prev) => ({ ...prev, ...data }));
+          setConfig((prev) => ({
+            ...prev,
+            ...parseApiResponse(data as Record<string, unknown>),
+          }));
         }
       })
       .catch(() => {/* silently use defaults */});
@@ -154,26 +243,9 @@ export function BehaviorEditor() {
     setTimeout(() => setToast(null), 3000);
   }
 
-  async function handleSave() {
-    setSaving(true);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/config/clinic`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
-      });
-      if (!res.ok) throw new Error("Falha ao salvar");
-      showToast("Configurações salvas com sucesso!");
-    } catch {
-      showToast("Erro ao salvar configurações. Tente novamente.", "error");
-    } finally {
-      setSaving(false);
-    }
-  }
+  // ── Fetch prompt preview from backend (source of truth) ───────────────────
 
-  async function handleTogglePrompt() {
-    if (showPrompt) { setShowPrompt(false); return; }
-    setShowPrompt(true);
+  const fetchPromptPreview = useCallback(async () => {
     setLoadingPrompt(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/config/prompt`);
@@ -184,9 +256,38 @@ export function BehaviorEditor() {
     } finally {
       setLoadingPrompt(false);
     }
+  }, []);
+
+  // ── Save — sends structured fields, backend mounts the final prompt text ──
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/config/clinic`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildPayload(config)),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      showToast("Configurações salvas com sucesso!");
+      // Re-fetch the prompt preview so the displayed text reflects the new build
+      if (showPrompt) {
+        await fetchPromptPreview();
+      }
+    } catch {
+      showToast("Erro ao salvar configurações. Tente novamente.", "error");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  // ── Unidades helpers ──────────────────────────────────────────────────────
+  async function handleTogglePrompt() {
+    if (showPrompt) { setShowPrompt(false); return; }
+    setShowPrompt(true);
+    await fetchPromptPreview();
+  }
+
+  // ── Unidades helpers ───────────────────────────────────────────────────────
 
   function addUnidade() {
     set("unidades", [...config.unidades, { nome: "", cidade: "", telefone: "", endereco: "" }]);
@@ -201,7 +302,7 @@ export function BehaviorEditor() {
     set("unidades", config.unidades.filter((_, i) => i !== idx));
   }
 
-  // ── Convênios helpers ─────────────────────────────────────────────────────
+  // ── Convênios helpers ──────────────────────────────────────────────────────
 
   function addConvenio() {
     const v = newConvenio.trim();
@@ -214,7 +315,7 @@ export function BehaviorEditor() {
     set("convenios", config.convenios.filter((x) => x !== c));
   }
 
-  // ── Restrições helpers ────────────────────────────────────────────────────
+  // ── Restrições helpers ─────────────────────────────────────────────────────
 
   function addRestricao() {
     const v = newRestricao.trim();
@@ -226,6 +327,8 @@ export function BehaviorEditor() {
   function removeRestricao(r: string) {
     set("restricoes", config.restricoes.filter((x) => x !== r));
   }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col gap-6">
@@ -388,7 +491,18 @@ export function BehaviorEditor() {
           <Toggle checked={config.mensagensCurtas} onChange={(v) => set("mensagensCurtas", v)} label="Priorizar mensagens curtas e objetivas" />
           <Toggle checked={config.nuncaInformarValores} onChange={(v) => set("nuncaInformarValores", v)} label="Nunca informar valores ou preços" />
           <Toggle checked={config.encaminharUrgencias} onChange={(v) => set("encaminharUrgencias", v)} label="Encaminhar urgências para atendimento humano" />
-          <Toggle checked={config.perguntarConvenio} onChange={(v) => set("perguntarConvenio", v)} label="Perguntar convênio antes de verificar agenda" />
+
+          {/* Convênio checkbox — with hint about recommended value */}
+          <div className="flex flex-col gap-1">
+            <Toggle
+              checked={config.perguntarConvenio}
+              onChange={(v) => set("perguntarConvenio", v)}
+              label="Perguntar convênio antes de verificar agenda"
+            />
+            <p className="ml-6 text-[11px] text-muted-foreground">
+              Recomendado: deixar <strong>desmarcado</strong> — o convênio é perguntado automaticamente após o paciente escolher o horário.
+            </p>
+          </div>
         </div>
       </SectionCard>
 
@@ -442,7 +556,7 @@ export function BehaviorEditor() {
         {saving ? "Salvando..." : "Salvar configurações"}
       </Button>
 
-      {/* ── Preview do prompt ── */}
+      {/* ── Preview do prompt (sempre via GET ao backend) ── */}
       <div className="rounded-xl border border-border bg-white shadow-sm">
         <button
           onClick={handleTogglePrompt}
@@ -450,12 +564,19 @@ export function BehaviorEditor() {
         >
           <div>
             <p className="text-sm font-semibold text-primary">Ver prompt gerado</p>
-            <p className="text-xs text-muted-foreground">Visualize o prompt final montado automaticamente pelo sistema</p>
+            <p className="text-xs text-muted-foreground">Texto final montado pelo servidor após salvar</p>
           </div>
           {showPrompt ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
         </button>
         {showPrompt && (
           <div className="border-t border-border px-5 py-4">
+            {/* Informative note */}
+            <div className="mb-3 flex items-start gap-2 rounded-lg bg-blue-50 px-3 py-2.5">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+              <p className="text-[11px] text-blue-700">
+                Este texto inclui automaticamente as <strong>regras fixas de comportamento da IA</strong> (não editáveis por este painel) além dos campos configurados acima.
+              </p>
+            </div>
             {loadingPrompt ? (
               <div className="h-32 animate-pulse rounded-lg bg-muted" />
             ) : (

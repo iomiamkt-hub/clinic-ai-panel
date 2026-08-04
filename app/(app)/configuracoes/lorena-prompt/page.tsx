@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, ClipboardCopy, Save, AlertTriangle, X, Check } from "lucide-react";
+import { ArrowLeft, ClipboardCopy, Save, AlertTriangle, X, Check, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { configApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -216,7 +216,19 @@ export default function LorenaPromptPage() {
         </div>
       </div>
 
-      {/* Warning banner */}
+      {/* Advanced-mode override warning — always visible */}
+      <div className="flex items-start gap-3 border-b border-blue-200 bg-blue-50 px-8 py-3.5">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+        <p className="text-xs text-blue-800">
+          <strong>Edição avançada —</strong> o texto aqui sobrescreve diretamente o prompt da Lorena e{" "}
+          <strong>será substituído automaticamente</strong> na próxima vez que alguém salvar configurações
+          na tela <a href="/treinamento" className="underline hover:no-underline">Treinamento</a>.
+          Use o <a href="/treinamento" className="underline hover:no-underline">Treinamento</a> para
+          configuração normal; esta tela é apenas para ajustes emergenciais no texto final.
+        </p>
+      </div>
+
+      {/* Production-impact warning */}
       <div className="flex items-start gap-3 border-b border-warning/20 bg-warning/5 px-8 py-3">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
         <p className="text-xs text-warning">
