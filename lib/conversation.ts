@@ -6,56 +6,79 @@ interface FunnelBadgeConfig {
 }
 
 const stageBadgeConfig: Record<string, FunnelBadgeConfig> = {
-  GREETING: { label: "Lead novo", className: "bg-sky-100 text-sky-700" },
-  COLLECTING_INFO: { label: "Em atendimento", className: "bg-yellow-100 text-yellow-700" },
-  CHECKING_AVAILABILITY: { label: "Verificando agenda", className: "bg-orange-100 text-orange-600" },
-  CONFIRMING: { label: "Confirmando", className: "bg-secondary/15 text-secondary" },
-  COMPLETED: { label: "Agendado", className: "bg-success/15 text-success" },
-  ESCALATED: { label: "Aguardando secretaria", className: "bg-danger/15 text-danger" },
+  // Real DB enum values
+  WELCOME:       { label: "Lead novo",          className: "bg-sky-100 text-sky-700" },
+  COLLECTING:    { label: "Em atendimento",     className: "bg-yellow-100 text-yellow-700" },
+  CHECKING:      { label: "Verificando agenda", className: "bg-orange-100 text-orange-600" },
+  CHOOSING:      { label: "Escolhendo horário", className: "bg-amber-100 text-amber-700" },
+  CONFIRMING:    { label: "Confirmando",        className: "bg-secondary/15 text-secondary" },
+  BOOKING:       { label: "Confirmando",        className: "bg-secondary/15 text-secondary" },
+  FINISHED:      { label: "Agendado",           className: "bg-success/15 text-success" },
+  WAITING_HUMAN: { label: "Aguardando humano",  className: "bg-danger/15 text-danger" },
+  // Legacy aliases (keep for backward compat)
+  GREETING:             { label: "Lead novo",          className: "bg-sky-100 text-sky-700" },
+  COLLECTING_INFO:      { label: "Em atendimento",     className: "bg-yellow-100 text-yellow-700" },
+  CHECKING_AVAILABILITY:{ label: "Verificando agenda", className: "bg-orange-100 text-orange-600" },
+  COMPLETED:            { label: "Agendado",           className: "bg-success/15 text-success" },
+  ESCALATED:            { label: "Aguardando humano",  className: "bg-danger/15 text-danger" },
 };
-
-const waitingHumanBadge: FunnelBadgeConfig = { label: "Com secretaria", className: "bg-purple-100 text-purple-700" };
 
 const defaultBadge: FunnelBadgeConfig = { label: "Nao informado", className: "bg-muted text-muted-foreground" };
 
 export type FunnelKey =
-  | "GREETING"
-  | "COLLECTING_INFO"
-  | "CHECKING_AVAILABILITY"
+  | "WELCOME"
+  | "COLLECTING"
+  | "CHECKING"
+  | "CHOOSING"
   | "CONFIRMING"
-  | "COMPLETED"
+  | "FINISHED"
   | "WAITING_HUMAN";
 
 export const FUNNEL_STAGES: { key: FunnelKey; label: string; className: string }[] = [
-  { key: "GREETING", ...stageBadgeConfig.GREETING },
-  { key: "COLLECTING_INFO", ...stageBadgeConfig.COLLECTING_INFO },
-  { key: "CHECKING_AVAILABILITY", ...stageBadgeConfig.CHECKING_AVAILABILITY },
-  { key: "CONFIRMING", ...stageBadgeConfig.CONFIRMING },
-  { key: "COMPLETED", ...stageBadgeConfig.COMPLETED },
-  { key: "WAITING_HUMAN", ...waitingHumanBadge },
+  { key: "WELCOME",       ...stageBadgeConfig.WELCOME },
+  { key: "COLLECTING",    ...stageBadgeConfig.COLLECTING },
+  { key: "CHECKING",      ...stageBadgeConfig.CHECKING },
+  { key: "CHOOSING",      ...stageBadgeConfig.CHOOSING },
+  { key: "CONFIRMING",    ...stageBadgeConfig.CONFIRMING },
+  { key: "FINISHED",      ...stageBadgeConfig.FINISHED },
+  { key: "WAITING_HUMAN", ...stageBadgeConfig.WAITING_HUMAN },
 ];
 
 export const STAGE_PATCH_VALUE: Record<FunnelKey, string> = {
-  GREETING: "GREETING",
-  COLLECTING_INFO: "COLLECTING_INFO",
-  CHECKING_AVAILABILITY: "CHECKING_AVAILABILITY",
-  CONFIRMING: "CONFIRMING",
-  COMPLETED: "COMPLETED",
-  WAITING_HUMAN: "ESCALATED",
+  WELCOME:       "WELCOME",
+  COLLECTING:    "COLLECTING",
+  CHECKING:      "CHECKING",
+  CHOOSING:      "CHOOSING",
+  CONFIRMING:    "CONFIRMING",
+  FINISHED:      "FINISHED",
+  WAITING_HUMAN: "WAITING_HUMAN",
+};
+
+// Maps legacy / alias stage values to canonical FunnelKey
+const STAGE_ALIAS_MAP: Record<string, FunnelKey> = {
+  GREETING:              "WELCOME",
+  COLLECTING_INFO:       "COLLECTING",
+  CHECKING_AVAILABILITY: "CHECKING",
+  BOOKING:               "CONFIRMING",
+  COMPLETED:             "FINISHED",
+  ESCALATED:             "WAITING_HUMAN",
 };
 
 export function getFunnelKey(conversation?: Pick<Conversation, "status" | "stage"> | null): FunnelKey | null {
   if (!conversation) return null;
-  if (conversation.status === "WAITING_HUMAN") return "WAITING_HUMAN";
-  if (!conversation.stage) return null;
-  return FUNNEL_STAGES.some((s) => s.key === conversation.stage) ? (conversation.stage as FunnelKey) : null;
+  const stage = conversation.stage ?? "";
+  if (conversation.status === "WAITING_HUMAN" || stage === "WAITING_HUMAN") return "WAITING_HUMAN";
+  if (!stage) return null;
+  if (FUNNEL_STAGES.some((s) => s.key === stage)) return stage as FunnelKey;
+  return STAGE_ALIAS_MAP[stage] ?? null;
 }
 
 export function getFunnelBadge(conversation?: Pick<Conversation, "status" | "stage"> | null): FunnelBadgeConfig {
   if (!conversation) return defaultBadge;
-  if (conversation.status === "WAITING_HUMAN") return waitingHumanBadge;
-  if (!conversation.stage) return defaultBadge;
-  return stageBadgeConfig[conversation.stage] ?? { label: conversation.stage, className: defaultBadge.className };
+  const stage = conversation.stage ?? "";
+  if (conversation.status === "WAITING_HUMAN" || stage === "WAITING_HUMAN") return stageBadgeConfig.WAITING_HUMAN;
+  if (!stage) return defaultBadge;
+  return stageBadgeConfig[stage] ?? { label: stage, className: defaultBadge.className };
 }
 
 export function translateStage(stage?: ConversationStage | null): string {

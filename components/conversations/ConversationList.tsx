@@ -192,7 +192,7 @@ export function ConversationList() {
   }, [conversations, stageFilter, statusFilter, periodFilter, searchQuery]);
 
   const summaryActive = conversations.filter((c) => c?.status === "ACTIVE").length;
-  const summaryBooked = conversations.filter((c) => c?.stage === "COMPLETED").length;
+  const summaryBooked = conversations.filter((c) => c?.stage === "FINISHED" || c?.stage === "COMPLETED").length;
 
   return (
     <div className="flex flex-col gap-4">
