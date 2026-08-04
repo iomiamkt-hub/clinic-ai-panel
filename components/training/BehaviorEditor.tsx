@@ -252,10 +252,11 @@ export function BehaviorEditor() {
   const [newConvenio, setNewConvenio] = useState("");
   // Restrições
   const [newRestricao, setNewRestricao] = useState("");
-  // Prompt preview
+  // Prompt preview / edit
   const [showPrompt, setShowPrompt] = useState(false);
   const [promptText, setPromptText] = useState("");
   const [loadingPrompt, setLoadingPrompt] = useState(false);
+  const [savingPrompt, setSavingPrompt] = useState(false);
 
   // ── Load config on mount ───────────────────────────────────────────────────
 
@@ -324,6 +325,39 @@ export function BehaviorEditor() {
     if (showPrompt) { setShowPrompt(false); return; }
     setShowPrompt(true);
     await fetchPromptPreview();
+  }
+
+  async function handleSavePrompt() {
+    if (!promptText.trim() || promptText.trim().length < 50) {
+      showToast("O texto do prompt parece muito curto. Verifique antes de salvar.", "error");
+      return;
+    }
+    setSavingPrompt(true);
+    try {
+      // Try key-value endpoint first, fall back to legacy prompt endpoint
+      let saved = false;
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/config/key/lorena_prompt`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ value: promptText }),
+        });
+        if (res.ok) saved = true;
+      } catch { /* try legacy */ }
+      if (!saved) {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/config/prompt`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: promptText }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      }
+      showToast("Texto do prompt salvo! A Lorena já está usando o novo comportamento.");
+    } catch {
+      showToast("Erro ao salvar o texto do prompt. Tente novamente.", "error");
+    } finally {
+      setSavingPrompt(false);
+    }
   }
 
   // ── Unidades helpers ───────────────────────────────────────────────────────
@@ -634,22 +668,31 @@ export function BehaviorEditor() {
         {saving ? "Salvando..." : "Salvar configurações"}
       </Button>
 
-      {/* ── Preview do prompt (sempre via GET ao backend) ── */}
+      {/* ── Ver / Editar prompt gerado ── */}
       <div className="rounded-xl border border-border bg-white shadow-sm">
         <button
           onClick={handleTogglePrompt}
           className="flex w-full items-center justify-between px-5 py-4 text-left"
         >
           <div>
-            <p className="text-sm font-semibold text-primary">Ver prompt gerado</p>
-            <p className="text-xs text-muted-foreground">Texto final montado pelo servidor após salvar</p>
+            <p className="text-sm font-semibold text-primary">Ver / Editar prompt gerado</p>
+            <p className="text-xs text-muted-foreground">Texto final montado pelo servidor — editável para ajustes pontuais</p>
           </div>
           {showPrompt ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
         </button>
         {showPrompt && (
-          <div className="border-t border-border px-5 py-4">
-            {/* Informative note */}
-            <div className="mb-3 flex items-start gap-2 rounded-lg bg-blue-50 px-3 py-2.5">
+          <div className="border-t border-border px-5 py-4 flex flex-col gap-3">
+            {/* Warning about manual edit being overwritten */}
+            <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+              <p className="text-[11px] text-warning">
+                <strong>Atenção:</strong> Editar este texto diretamente sobrescreve o que os campos acima geram.
+                Da próxima vez que você salvar as <strong>configurações estruturadas</strong> (botão principal acima),
+                este texto manual será substituído pelo prompt gerado automaticamente.
+              </p>
+            </div>
+            {/* Info note */}
+            <div className="flex items-start gap-2 rounded-lg bg-blue-50 px-3 py-2.5">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
               <p className="text-[11px] text-blue-700">
                 Este texto inclui automaticamente as <strong>regras fixas de comportamento da IA</strong> (não editáveis por este painel) além dos campos configurados acima.
@@ -659,12 +702,25 @@ export function BehaviorEditor() {
               <div className="h-32 animate-pulse rounded-lg bg-muted" />
             ) : (
               <textarea
-                readOnly
                 value={promptText}
-                rows={14}
-                className="w-full resize-none rounded-lg bg-gray-50 px-4 py-3 font-mono text-xs text-muted-foreground outline-none"
+                onChange={(e) => setPromptText(e.target.value)}
+                rows={18}
+                spellCheck={false}
+                className="w-full resize-none rounded-lg border border-border bg-gray-50 px-4 py-3 font-mono text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/30"
               />
             )}
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] text-muted-foreground">
+                {promptText.length.toLocaleString("pt-BR")} caracteres · mínimo 50 obrigatório
+              </p>
+              <Button
+                onClick={handleSavePrompt}
+                disabled={savingPrompt || loadingPrompt || promptText.trim().length < 50}
+                className="gap-1.5 bg-warning text-white hover:bg-warning/90"
+              >
+                {savingPrompt ? "Salvando..." : "Salvar texto manualmente"}
+              </Button>
+            </div>
           </div>
         )}
       </div>

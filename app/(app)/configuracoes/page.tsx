@@ -397,16 +397,15 @@ export default function ConfiguracoesPage() {
                 </p>
               </div>
               <a
-                href="/configuracoes/lorena-prompt"
+                href="/treinamento"
                 className="rounded-lg border border-border bg-white px-4 py-2 text-xs font-semibold text-primary shadow-sm transition-colors hover:bg-muted"
               >
-                Editar prompt →
+                Editar no Treinamento →
               </a>
             </CardHeader>
             <CardContent>
               <p className="text-xs text-muted-foreground">
-                Alterações entram em vigor imediatamente, sem necessidade de reiniciar o servidor. Restrito a
-                administradores.
+                A edição do prompt foi movida para a tela de Treinamento (seção "Ver / Editar prompt gerado"). Alterações entram em vigor imediatamente.
               </p>
             </CardContent>
           </Card>
