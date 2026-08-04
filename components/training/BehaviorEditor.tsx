@@ -73,49 +73,59 @@ const DEFAULT_CONFIG: BehaviorConfig = {
 };
 
 // ── Parse API response → BehaviorConfig ───────────────────────────────────────
-// Handles both the flat legacy shape and the nested shape the new backend returns.
+// Backend canonical names (post-consolidation) are English camelCase flat fields.
+// Legacy Portuguese / nested aliases are kept as fallback for old data.
 
 function parseApiResponse(data: Record<string, unknown>): Partial<BehaviorConfig> {
   const parsed: Partial<BehaviorConfig> = {};
 
-  // ── Identidade ──────────────────────────────────────────────────────────────
-  const ident = (data.personalidade as Record<string, unknown> | undefined) ?? data;
-  parsed.nomeIA           = String(ident.nomeIA ?? data.nomeIA ?? DEFAULT_CONFIG.nomeIA);
-  parsed.personalidade    = String(ident.personalidade ?? data.personalidade ?? "");
-  parsed.usarEmojis       = Boolean(ident.usarEmojis ?? data.usarEmojis ?? true);
-  parsed.tratamentoInformal = Boolean(ident.tratamentoInformal ?? data.tratamentoInformal ?? true);
-  parsed.tratamentoFormal   = Boolean(ident.tratamentoFormal ?? data.tratamentoFormal ?? false);
-
-  // ── Clínica ─────────────────────────────────────────────────────────────────
-  const info = (data.informacoesClinica as Record<string, unknown> | undefined) ?? data;
-  parsed.nomeClinica       = String(info.nomeClinica ?? data.nomeClinica ?? "");
-  parsed.medicoResponsavel = String(info.medicoResponsavel ?? data.medicoResponsavel ?? "");
-  parsed.especialidade     = String(info.especialidade ?? data.especialidade ?? "");
-  parsed.unidades          = (Array.isArray(info.unidades ?? data.unidades) ? (info.unidades ?? data.unidades) : []) as Unidade[];
-  parsed.convenios         = (Array.isArray(info.convenios ?? data.convenios) ? (info.convenios ?? data.convenios) : []) as string[];
-
-  // ── Regras ──────────────────────────────────────────────────────────────────
-  // Backend may return nested `rules` or `regrasAtendimento`, or flat fields.
+  // Nested fallback objects (legacy backend shape — may no longer be returned)
+  const ident = (data.personalidade as Record<string, unknown> | undefined) ?? {};
+  const info  = (data.informacoesClinica as Record<string, unknown> | undefined) ?? {};
   const rules = (
     (data.regrasAtendimento as Record<string, unknown> | undefined) ??
     (data.rules as Record<string, unknown> | undefined) ??
-    data
+    {}
   );
-  parsed.confirmarAgendamento  = Boolean(rules.confirmarAgendamento ?? data.confirmarAgendamento ?? true);
-  parsed.mensagensCurtas       = Boolean(rules.mensagensCurtas ?? data.mensagensCurtas ?? true);
-  parsed.nuncaInformarValores  = Boolean(rules.nuncaInformarValores ?? data.nuncaInformarValores ?? false);
-  parsed.encaminharUrgencias   = Boolean(rules.encaminharUrgencias ?? data.encaminharUrgencias ?? true);
-  // New canonical field name from backend; fallback to old flat name
-  parsed.perguntarConvenio = Boolean(
+
+  // ── Identidade ──────────────────────────────────────────────────────────────
+  parsed.nomeIA             = String(data.nomeIA ?? ident.nomeIA ?? DEFAULT_CONFIG.nomeIA);
+  // `personalidade` at top-level is the string description when the backend is flat
+  const persValue = typeof data.personalidade === "string" ? data.personalidade : (ident.personalidade ?? "");
+  parsed.personalidade      = String(persValue);
+  parsed.usarEmojis         = Boolean(data.usarEmojis ?? ident.usarEmojis ?? true);
+  parsed.tratamentoInformal = Boolean(data.tratamentoInformal ?? ident.tratamentoInformal ?? true);
+  parsed.tratamentoFormal   = Boolean(data.tratamentoFormal ?? ident.tratamentoFormal ?? false);
+
+  // ── Clínica — canonical English names, Portuguese legacy as fallback ─────────
+  parsed.nomeClinica       = String(data.clinicName ?? data.nomeClinica ?? info.nomeClinica ?? "");
+  parsed.medicoResponsavel = String(data.doctorName ?? data.medicoResponsavel ?? info.medicoResponsavel ?? "");
+  parsed.especialidade     = String(data.specialty ?? data.especialidade ?? info.especialidade ?? "");
+
+  const unitsRaw = data.units ?? data.unidades ?? info.unidades;
+  parsed.unidades = Array.isArray(unitsRaw) ? (unitsRaw as Unidade[]) : [];
+
+  // `insurances` is the canonical field; `convenios` / `informacoesClinica.convenios` are legacy
+  const insRaw = data.insurances ?? data.convenios ?? info.convenios;
+  parsed.convenios = Array.isArray(insRaw) ? (insRaw as string[]) : [];
+
+  // ── Regras ──────────────────────────────────────────────────────────────────
+  parsed.confirmarAgendamento = Boolean(data.confirmarAgendamento ?? rules.confirmarAgendamento ?? true);
+  parsed.mensagensCurtas      = Boolean(data.mensagensCurtas ?? rules.mensagensCurtas ?? true);
+  parsed.nuncaInformarValores = Boolean(data.nuncaInformarValores ?? rules.nuncaInformarValores ?? false);
+  parsed.encaminharUrgencias  = Boolean(data.encaminharUrgencias ?? rules.encaminharUrgencias ?? true);
+  parsed.perguntarConvenio    = Boolean(
+    data.askInsuranceBeforeAvailability ??
     rules.askInsuranceBeforeAvailability ??
-    rules.perguntarConvenio ??
     data.perguntarConvenio ??
+    rules.perguntarConvenio ??
     false,
   );
 
-  // ── Conhecimento / Restrições ────────────────────────────────────────────────
-  parsed.conhecimento = String(data.conhecimento ?? "");
-  parsed.restricoes   = Array.isArray(data.restricoes) ? (data.restricoes as string[]) : DEFAULT_CONFIG.restricoes;
+  // ── Conhecimento / Restrições — canonical English names, Portuguese as fallback
+  parsed.conhecimento = String(data.customKnowledge ?? data.conhecimento ?? "");
+  const restRaw = data.restrictions ?? data.restricoes;
+  parsed.restricoes = Array.isArray(restRaw) ? (restRaw as string[]) : DEFAULT_CONFIG.restricoes;
 
   // ── Conteúdo clínico ─────────────────────────────────────────────────────────
   const cc = (data.clinicalContent as Record<string, unknown> | undefined) ?? {};
@@ -127,45 +137,52 @@ function parseApiResponse(data: Record<string, unknown>): Partial<BehaviorConfig
 }
 
 // ── Build structured payload for POST /api/config/clinic ─────────────────────
-// Matches the new backend contract: nested objects per section.
+// Sends canonical English field names (post-consolidation backend).
+// Portuguese aliases are included for backward compat with older backend versions.
 
 function buildPayload(config: BehaviorConfig) {
   return {
-    // Keep flat fields at top-level for backward compat with old backend
-    ...config,
-    // Also send the structured nested shape the new backend now reads
-    personalidade: {
-      nomeIA:             config.nomeIA,
-      personalidade:      config.personalidade,
-      usarEmojis:         config.usarEmojis,
-      tratamentoInformal: config.tratamentoInformal,
-      tratamentoFormal:   config.tratamentoFormal,
-    },
-    informacoesClinica: {
-      nomeClinica:       config.nomeClinica,
-      medicoResponsavel: config.medicoResponsavel,
-      especialidade:     config.especialidade,
-      unidades:          config.unidades,
-      convenios:         config.convenios,
-    },
-    regrasAtendimento: {
-      confirmarAgendamento:           config.confirmarAgendamento,
-      mensagensCurtas:                config.mensagensCurtas,
-      nuncaInformarValores:           config.nuncaInformarValores,
-      encaminharUrgencias:            config.encaminharUrgencias,
-      // Use the canonical backend field name
-      askInsuranceBeforeAvailability: config.perguntarConvenio,
-      // Keep old name as alias for backend compatibility
-      perguntarConvenio:              config.perguntarConvenio,
-    },
-    conhecimento: config.conhecimento,
-    restricoes:   config.restricoes,
+    // ── Identity ──────────────────────────────────────────────────────────────
+    nomeIA:             config.nomeIA,
+    personalidade:      config.personalidade,
+    usarEmojis:         config.usarEmojis,
+    tratamentoInformal: config.tratamentoInformal,
+    tratamentoFormal:   config.tratamentoFormal,
+
+    // ── Clinic info — canonical English names ─────────────────────────────────
+    clinicName:        config.nomeClinica,
+    doctorName:        config.medicoResponsavel,
+    specialty:         config.especialidade,
+    units:             config.unidades,
+    insurances:        config.convenios,   // canonical field (was convenios)
+    // Portuguese aliases (backward compat)
+    nomeClinica:       config.nomeClinica,
+    medicoResponsavel: config.medicoResponsavel,
+    especialidade:     config.especialidade,
+    unidades:          config.unidades,
+    convenios:         config.convenios,
+
+    // ── Rules ─────────────────────────────────────────────────────────────────
+    confirmarAgendamento:           config.confirmarAgendamento,
+    mensagensCurtas:                config.mensagensCurtas,
+    nuncaInformarValores:           config.nuncaInformarValores,
+    encaminharUrgencias:            config.encaminharUrgencias,
+    askInsuranceBeforeAvailability: config.perguntarConvenio,
+    perguntarConvenio:              config.perguntarConvenio,
+
+    // ── Knowledge / Restrictions — canonical English names ────────────────────
+    customKnowledge: config.conhecimento,
+    restrictions:    config.restricoes,
+    // Portuguese aliases (backward compat)
+    conhecimento:    config.conhecimento,
+    restricoes:      config.restricoes,
+
+    // ── Clinical content ──────────────────────────────────────────────────────
     clinicalContent: {
       preConsultaInstructions: config.preConsultaInstructions,
       newPatientMessage:       config.newPatientMessage,
       waitlistInstructions:    config.waitlistInstructions,
     },
-    // flat aliases for backward compat
     preConsultaInstructions: config.preConsultaInstructions,
     newPatientMessage:       config.newPatientMessage,
     waitlistInstructions:    config.waitlistInstructions,
