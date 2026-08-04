@@ -39,6 +39,10 @@ interface BehaviorConfig {
   conhecimento: string;
   // Restrições
   restricoes: string[];
+  // Conteúdo clínico
+  preConsultaInstructions: string;
+  newPatientMessage: string;
+  waitlistInstructions: string;
 }
 
 const DEFAULT_CONFIG: BehaviorConfig = {
@@ -58,6 +62,9 @@ const DEFAULT_CONFIG: BehaviorConfig = {
   encaminharUrgencias: true,
   perguntarConvenio: false,
   conhecimento: "",
+  preConsultaInstructions: "",
+  newPatientMessage: "",
+  waitlistInstructions: "",
   restricoes: [
     "Nunca emitir diagnóstico médico",
     "Nunca prometer disponibilidade sem verificar",
@@ -110,6 +117,12 @@ function parseApiResponse(data: Record<string, unknown>): Partial<BehaviorConfig
   parsed.conhecimento = String(data.conhecimento ?? "");
   parsed.restricoes   = Array.isArray(data.restricoes) ? (data.restricoes as string[]) : DEFAULT_CONFIG.restricoes;
 
+  // ── Conteúdo clínico ─────────────────────────────────────────────────────────
+  const cc = (data.clinicalContent as Record<string, unknown> | undefined) ?? {};
+  parsed.preConsultaInstructions = String(cc.preConsultaInstructions ?? data.preConsultaInstructions ?? "");
+  parsed.newPatientMessage       = String(cc.newPatientMessage ?? data.newPatientMessage ?? "");
+  parsed.waitlistInstructions    = String(cc.waitlistInstructions ?? data.waitlistInstructions ?? "");
+
   return parsed;
 }
 
@@ -147,6 +160,15 @@ function buildPayload(config: BehaviorConfig) {
     },
     conhecimento: config.conhecimento,
     restricoes:   config.restricoes,
+    clinicalContent: {
+      preConsultaInstructions: config.preConsultaInstructions,
+      newPatientMessage:       config.newPatientMessage,
+      waitlistInstructions:    config.waitlistInstructions,
+    },
+    // flat aliases for backward compat
+    preConsultaInstructions: config.preConsultaInstructions,
+    newPatientMessage:       config.newPatientMessage,
+    waitlistInstructions:    config.waitlistInstructions,
   };
 }
 
@@ -545,6 +567,45 @@ export function BehaviorEditor() {
             <Plus className="h-3.5 w-3.5" /> Adicionar
           </Button>
         </div>
+      </SectionCard>
+
+      {/* ── Bloco 6: Instruções pré-consulta ── */}
+      <SectionCard
+        title="Instruções pré-consulta"
+        description="Texto enviado ao paciente após o agendamento ser confirmado"
+      >
+        <Textarea
+          value={config.preConsultaInstructions}
+          onChange={(e) => set("preConsultaInstructions", e.target.value)}
+          placeholder="Ex: Lembre-se de trazer RG, cartão do convênio e exames anteriores. Chegue 15 minutos antes do horário marcado."
+          rows={7}
+        />
+      </SectionCard>
+
+      {/* ── Bloco 7: Mensagem para paciente novo ── */}
+      <SectionCard
+        title="Mensagem para paciente novo"
+        description="Texto enviado quando o paciente entra em contato pela primeira vez"
+      >
+        <Textarea
+          value={config.newPatientMessage}
+          onChange={(e) => set("newPatientMessage", e.target.value)}
+          placeholder="Ex: Olá! Seja bem-vindo à nossa clínica. Para agendar sua primeira consulta, preciso de algumas informações..."
+          rows={11}
+        />
+      </SectionCard>
+
+      {/* ── Bloco 8: Lista de espera ── */}
+      <SectionCard
+        title="Lista de espera"
+        description="Texto enviado quando não há horário disponível e o paciente entra para a lista de espera"
+      >
+        <Textarea
+          value={config.waitlistInstructions}
+          onChange={(e) => set("waitlistInstructions", e.target.value)}
+          placeholder="Ex: No momento não há horários disponíveis. Vou anotá-lo(a) na lista de espera e entraremos em contato assim que surgir uma vaga."
+          rows={7}
+        />
       </SectionCard>
 
       {/* ── Salvar ── */}
