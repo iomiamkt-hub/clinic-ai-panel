@@ -65,6 +65,11 @@ export const configApi = {
     api.patch("/api/config/schedule", { schedule }).then((r) => r.data),
   updateOutOfHoursMessage: (message: string) =>
     api.patch("/api/config/out-of-hours-message", { message }).then((r) => r.data),
+  // Generic key-value config access (reusable for future keys)
+  getConfigKey: (key: string) =>
+    api.get<{ key: string; value: string; updatedAt: string | null }>(`/api/config/key/${key}`).then((r) => r.data),
+  patchConfigKey: (key: string, value: string) =>
+    api.patch<{ key: string; value: string; updatedAt: string }>(`/api/config/key/${key}`, { value }).then((r) => r.data),
 };
 
 export const chatApi = {

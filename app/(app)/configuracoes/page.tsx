@@ -385,6 +385,33 @@ export default function ConfiguracoesPage() {
           </>
         ) : null}
 
+        {/* System Prompt da Lorena — admin only */}
+        {(session?.user?.name === "IOMIA (Admin)" ||
+          (session?.user as Record<string, unknown> | undefined)?.username === "admin") && (
+          <Card>
+            <CardHeader className="flex-row items-center justify-between">
+              <div>
+                <CardTitle>System Prompt da Lorena</CardTitle>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Edite o comportamento completo da IA em produção
+                </p>
+              </div>
+              <a
+                href="/configuracoes/lorena-prompt"
+                className="rounded-lg border border-border bg-white px-4 py-2 text-xs font-semibold text-primary shadow-sm transition-colors hover:bg-muted"
+              >
+                Editar prompt →
+              </a>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                Alterações entram em vigor imediatamente, sem necessidade de reiniciar o servidor. Restrito a
+                administradores.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Kanban config link */}
         <Card>
           <CardHeader className="flex-row items-center justify-between">
