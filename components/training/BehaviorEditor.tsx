@@ -16,6 +16,19 @@ interface Unidade {
   endereco: string;
 }
 
+type ScriptedMode = "auto" | "fixed";
+interface ScriptedMessage {
+  mode: ScriptedMode;
+  fixedText?: string;
+}
+type ScriptedMessages = Record<string, ScriptedMessage>;
+
+interface FlowConfig {
+  checkingRequires: string[];
+  complementRequires: string[];
+  complementNovoOnlyRequires: string[];
+}
+
 interface BehaviorConfig {
   // Identidade
   nomeIA: string;
@@ -43,7 +56,42 @@ interface BehaviorConfig {
   preConsultaInstructions: string;
   newPatientMessage: string;
   waitlistInstructions: string;
+  // Fluxo e Abordagem
+  flowConfig: FlowConfig;
+  scriptedMessages: ScriptedMessages;
 }
+
+// ── Flow field definitions ─────────────────────────────────────────────────────
+
+const CHECKING_ALWAYS = ["nome_completo", "unidade"];
+
+const CHECKING_FIELDS: { key: string; label: string }[] = [
+  { key: "data_preferida",  label: "Data preferida" },
+  { key: "periodo",         label: "Período/horário" },
+  { key: "classificacao",   label: "Classificação" },
+  { key: "convenio",        label: "Convênio" },
+];
+
+const COMPLEMENT_FIELDS: { key: string; label: string }[] = [
+  { key: "convenio",        label: "Convênio (se não perguntado antes)" },
+  { key: "motivo",          label: "Motivo da consulta" },
+  { key: "data_nascimento", label: "Data de nascimento" },
+];
+
+const NOVO_FIELDS: { key: string; label: string }[] = [
+  { key: "cpf",       label: "CPF" },
+  { key: "rg",        label: "RG" },
+  { key: "endereco",  label: "Endereço" },
+  { key: "email",     label: "E-mail" },
+  { key: "profissao", label: "Profissão" },
+];
+
+const EVENT_FIELDS: { key: string; label: string }[] = [
+  { key: "saudacao_inicial",         label: "Saudação inicial" },
+  { key: "confirmacao_agendamento",  label: "Confirmação do agendamento" },
+  { key: "encerramento",             label: "Encerramento" },
+  { key: "transferencia_humano",     label: "Transferência para atendimento humano" },
+];
 
 const DEFAULT_CONFIG: BehaviorConfig = {
   nomeIA: "Lorena",
@@ -65,6 +113,14 @@ const DEFAULT_CONFIG: BehaviorConfig = {
   preConsultaInstructions: "",
   newPatientMessage: "",
   waitlistInstructions: "",
+  flowConfig: {
+    checkingRequires: [...CHECKING_ALWAYS, ...CHECKING_FIELDS.map((f) => f.key)],
+    complementRequires: COMPLEMENT_FIELDS.map((f) => f.key),
+    complementNovoOnlyRequires: NOVO_FIELDS.map((f) => f.key),
+  },
+  scriptedMessages: Object.fromEntries(
+    EVENT_FIELDS.map((f) => [f.key, { mode: "auto" as ScriptedMode }]),
+  ),
   restricoes: [
     "Nunca emitir diagnóstico médico",
     "Nunca prometer disponibilidade sem verificar",
@@ -133,6 +189,29 @@ function parseApiResponse(data: Record<string, unknown>): Partial<BehaviorConfig
   parsed.newPatientMessage       = String(cc.newPatientMessage ?? data.newPatientMessage ?? "");
   parsed.waitlistInstructions    = String(cc.waitlistInstructions ?? data.waitlistInstructions ?? "");
 
+  // ── Fluxo e Abordagem ────────────────────────────────────────────────────────
+  const fc = (data.flowConfig as Record<string, unknown> | undefined) ?? {};
+  const defFlow = DEFAULT_CONFIG.flowConfig;
+  const toStrArr = (v: unknown, fallback: string[]) =>
+    Array.isArray(v) ? (v as string[]) : fallback;
+
+  parsed.flowConfig = {
+    checkingRequires:           toStrArr(fc.checkingRequires,           defFlow.checkingRequires),
+    complementRequires:         toStrArr(fc.complementRequires,         defFlow.complementRequires),
+    complementNovoOnlyRequires: toStrArr(fc.complementNovoOnlyRequires, defFlow.complementNovoOnlyRequires),
+  };
+
+  const sm = (data.scriptedMessages as Record<string, unknown> | undefined) ?? {};
+  const defaultSm = DEFAULT_CONFIG.scriptedMessages;
+  const parsedSm: ScriptedMessages = {};
+  for (const f of EVENT_FIELDS) {
+    const raw = sm[f.key] as Record<string, unknown> | undefined;
+    parsedSm[f.key] = raw
+      ? { mode: (raw.mode === "fixed" ? "fixed" : "auto") as ScriptedMode, fixedText: String(raw.fixedText ?? "") }
+      : { ...defaultSm[f.key] };
+  }
+  parsed.scriptedMessages = parsedSm;
+
   return parsed;
 }
 
@@ -186,6 +265,18 @@ function buildPayload(config: BehaviorConfig) {
     preConsultaInstructions: config.preConsultaInstructions,
     newPatientMessage:       config.newPatientMessage,
     waitlistInstructions:    config.waitlistInstructions,
+
+    // ── Flow & scripted messages ───────────────────────────────────────────────
+    // Always include the always-required fields in checkingRequires
+    flowConfig: {
+      checkingRequires: [
+        ...CHECKING_ALWAYS,
+        ...config.flowConfig.checkingRequires.filter((k) => !CHECKING_ALWAYS.includes(k)),
+      ],
+      complementRequires:         config.flowConfig.complementRequires,
+      complementNovoOnlyRequires: config.flowConfig.complementNovoOnlyRequires,
+    },
+    scriptedMessages: config.scriptedMessages,
   };
 }
 
@@ -241,12 +332,115 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+function FlowFieldRow({
+  label,
+  checked,
+  onChecked,
+  mode,
+  fixedText,
+  onMode,
+  onText,
+}: {
+  label: string;
+  checked?: boolean;
+  onChecked?: (v: boolean) => void;
+  mode: ScriptedMode;
+  fixedText: string;
+  onMode: (m: ScriptedMode) => void;
+  onText: (t: string) => void;
+}) {
+  const hasCheckbox = onChecked !== undefined;
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-white p-3">
+      <div className="flex items-center gap-3 flex-wrap">
+        {hasCheckbox && (
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={checked ?? false}
+              onChange={(e) => onChecked!(e.target.checked)}
+              className="h-4 w-4 cursor-pointer rounded accent-secondary"
+            />
+            <span className="text-sm font-medium text-foreground">{label}</span>
+          </label>
+        )}
+        {!hasCheckbox && (
+          <span className="text-sm font-medium text-foreground flex-1">{label}</span>
+        )}
+        <div className="ml-auto flex items-center gap-1 rounded-full border border-border bg-muted/30 p-0.5 text-[11px] font-medium">
+          <button
+            onClick={() => onMode("auto")}
+            className={cn(
+              "rounded-full px-3 py-1 transition-colors",
+              mode === "auto" ? "bg-white shadow-sm text-primary" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Automático
+          </button>
+          <button
+            onClick={() => onMode("fixed")}
+            className={cn(
+              "rounded-full px-3 py-1 transition-colors",
+              mode === "fixed" ? "bg-white shadow-sm text-secondary" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Texto fixo
+          </button>
+        </div>
+      </div>
+      {mode === "fixed" && (
+        <div className="flex flex-col gap-1">
+          <Textarea
+            value={fixedText}
+            onChange={(e) => onText(e.target.value)}
+            placeholder="Digite o texto que será enviado..."
+            rows={3}
+          />
+          <p className="text-[10px] text-muted-foreground">
+            Use <code className="rounded bg-muted px-1 py-0.5">[Nome]</code> para inserir o nome do paciente automaticamente.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function BehaviorEditor() {
   const [config, setConfig] = useState<BehaviorConfig>(DEFAULT_CONFIG);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; variant: "success" | "error" } | null>(null);
+
+  // ── Flow helpers ──────────────────────────────────────────────────────────
+
+  function toggleRequires(group: keyof FlowConfig, key: string, checked: boolean) {
+    setConfig((prev) => {
+      const current = prev.flowConfig[group];
+      const next = checked ? [...current, key] : current.filter((k) => k !== key);
+      return { ...prev, flowConfig: { ...prev.flowConfig, [group]: next } };
+    });
+  }
+
+  function setScriptedMode(key: string, mode: ScriptedMode) {
+    setConfig((prev) => ({
+      ...prev,
+      scriptedMessages: {
+        ...prev.scriptedMessages,
+        [key]: { ...prev.scriptedMessages[key], mode },
+      },
+    }));
+  }
+
+  function setScriptedText(key: string, fixedText: string) {
+    setConfig((prev) => ({
+      ...prev,
+      scriptedMessages: {
+        ...prev.scriptedMessages,
+        [key]: { ...prev.scriptedMessages[key], fixedText },
+      },
+    }));
+  }
 
   // Convênios
   const [newConvenio, setNewConvenio] = useState("");
@@ -620,7 +814,115 @@ export function BehaviorEditor() {
         </div>
       </SectionCard>
 
-      {/* ── Bloco 6: Instruções pré-consulta ── */}
+      {/* ── Bloco 6: Fluxo e Abordagem ── */}
+      <SectionCard
+        title="Fluxo e Abordagem"
+        description="Quais informações pedir em cada etapa e como a IA responde em momentos-chave"
+      >
+        {/* ── Grupo 1: Antes de verificar a agenda ── */}
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Antes de verificar a agenda</FieldLabel>
+          <p className="text-[11px] text-muted-foreground">Informações coletadas antes de checar disponibilidade de horário.</p>
+
+          {/* Always-required — read-only info rows */}
+          {["Nome completo", "Unidade"].map((label) => (
+            <div key={label} className="flex items-center gap-3 rounded-lg bg-muted/40 px-3 py-2">
+              <span className="text-xs text-muted-foreground italic flex-1">
+                {label} — <strong>sempre obrigatório</strong>
+              </span>
+            </div>
+          ))}
+
+          {/* Configurable fields */}
+          {CHECKING_FIELDS.map(({ key, label }) => {
+            const checked = config.flowConfig.checkingRequires.includes(key);
+            const sm = config.scriptedMessages[key] ?? { mode: "auto" };
+            return (
+              <FlowFieldRow
+                key={key}
+                label={label}
+                checked={checked}
+                onChecked={(v) => toggleRequires("checkingRequires", key, v)}
+                mode={sm.mode}
+                fixedText={sm.fixedText ?? ""}
+                onMode={(m) => setScriptedMode(key, m)}
+                onText={(t) => setScriptedText(key, t)}
+              />
+            );
+          })}
+        </div>
+
+        <hr className="border-border" />
+
+        {/* ── Grupo 2: Depois de escolher o horário ── */}
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Depois de escolher o horário</FieldLabel>
+          <p className="text-[11px] text-muted-foreground">Informações complementares solicitadas após o paciente escolher um horário.</p>
+          {COMPLEMENT_FIELDS.map(({ key, label }) => {
+            const checked = config.flowConfig.complementRequires.includes(key);
+            const sm = config.scriptedMessages[key] ?? { mode: "auto" };
+            return (
+              <FlowFieldRow
+                key={key}
+                label={label}
+                checked={checked}
+                onChecked={(v) => toggleRequires("complementRequires", key, v)}
+                mode={sm.mode}
+                fixedText={sm.fixedText ?? ""}
+                onMode={(m) => setScriptedMode(key, m)}
+                onText={(t) => setScriptedText(key, t)}
+              />
+            );
+          })}
+        </div>
+
+        <hr className="border-border" />
+
+        {/* ── Grupo 3: Somente para paciente novo ── */}
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Somente para paciente novo</FieldLabel>
+          <p className="text-[11px] text-muted-foreground">Dados adicionais pedidos apenas para quem ainda não tem cadastro.</p>
+          {NOVO_FIELDS.map(({ key, label }) => {
+            const checked = config.flowConfig.complementNovoOnlyRequires.includes(key);
+            const sm = config.scriptedMessages[key] ?? { mode: "auto" };
+            return (
+              <FlowFieldRow
+                key={key}
+                label={label}
+                checked={checked}
+                onChecked={(v) => toggleRequires("complementNovoOnlyRequires", key, v)}
+                mode={sm.mode}
+                fixedText={sm.fixedText ?? ""}
+                onMode={(m) => setScriptedMode(key, m)}
+                onText={(t) => setScriptedText(key, t)}
+              />
+            );
+          })}
+        </div>
+
+        <hr className="border-border" />
+
+        {/* ── Grupo 4: Mensagens de evento ── */}
+        <div className="flex flex-col gap-2">
+          <FieldLabel>Mensagens de evento</FieldLabel>
+          <p className="text-[11px] text-muted-foreground">Mensagens enviadas automaticamente em momentos fixos do atendimento.</p>
+          {EVENT_FIELDS.map(({ key, label }) => {
+            const sm = config.scriptedMessages[key] ?? { mode: "auto" };
+            return (
+              <FlowFieldRow
+                key={key}
+                label={label}
+                mode={sm.mode}
+                fixedText={sm.fixedText ?? ""}
+                onMode={(m) => setScriptedMode(key, m)}
+                onText={(t) => setScriptedText(key, t)}
+              />
+            );
+          })}
+        </div>
+      </SectionCard>
+
+      {/* ── Instruções pré-consulta ── */}
       <SectionCard
         title="Instruções pré-consulta"
         description="Texto enviado ao paciente após o agendamento ser confirmado"
