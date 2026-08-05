@@ -64,6 +64,8 @@ interface BehaviorConfig {
   waitlistInstructions: string;
   // Fluxo e Abordagem — unified per-field config
   fieldsConfig: Record<string, FieldConfig>;
+  // Ordered list of keys for "Antes de verificar agenda" (includes CHECKING_ALWAYS + checking configurable fields)
+  checkingOrder: string[];
   // Event messages (saudacao_inicial etc.)
   scriptedMessages: ScriptedMessages;
 }
@@ -71,6 +73,15 @@ interface BehaviorConfig {
 // ── Flow field definitions ─────────────────────────────────────────────────────
 
 const CHECKING_ALWAYS = ["nome_completo", "unidade"];
+const CHECKING_ALWAYS_LABELS: Record<string, string> = {
+  nome_completo: "Nome completo",
+  unidade: "Unidade",
+};
+const DEFAULT_CHECKING_ORDER = [
+  "nome_completo",
+  "unidade",
+  ...["data_preferida", "periodo_preferido", "classificacao"],
+];
 
 // Fields eligible for "Só paciente novo" option in the dropdown
 const NOVO_ONLY_ELIGIBLE = new Set(["cpf", "rg", "endereco", "email", "profissao", "filiacao"]);
@@ -136,6 +147,7 @@ const DEFAULT_CONFIG: BehaviorConfig = {
       { whenToAsk: f.defaultWhen, mode: "auto" as ScriptedMode, fixedText: "", guidedText: "" },
     ]),
   ),
+  checkingOrder: DEFAULT_CHECKING_ORDER,
   scriptedMessages: Object.fromEntries(
     EVENT_FIELDS.map((f) => [f.key, { mode: "auto" as ScriptedMode, fixedText: "", guidedText: "" }]),
   ),
@@ -222,6 +234,9 @@ function parseApiResponse(data: Record<string, unknown>): Partial<BehaviorConfig
     return { mode, fixedText: String(r.fixedText ?? ""), guidedText: String(r.guidedText ?? "") };
   };
 
+  // checkingOrder: use backend array order (includes nome_completo, unidade); fallback to default
+  parsed.checkingOrder = checkingArr.length > 0 ? checkingArr : DEFAULT_CHECKING_ORDER;
+
   // Derive fieldsConfig from the three arrays + scriptedMessages
   const parsedFields: Record<string, FieldConfig> = {};
   for (const f of CONFIGURABLE_FIELDS) {
@@ -302,11 +317,8 @@ function buildPayload(config: BehaviorConfig) {
 
     // ── Flow & scripted messages ───────────────────────────────────────────────
     flowConfig: {
-      // CHECKING_ALWAYS always present; configurable fields placed by their dropdown value
-      checkingRequires: [
-        ...CHECKING_ALWAYS,
-        ...CONFIGURABLE_FIELDS.filter((f) => config.fieldsConfig[f.key]?.whenToAsk === "checking").map((f) => f.key),
-      ],
+      // Use checkingOrder directly — it already includes CHECKING_ALWAYS and preserves user's chosen order
+      checkingRequires: config.checkingOrder,
       complementRequires: CONFIGURABLE_FIELDS
         .filter((f) => config.fieldsConfig[f.key]?.whenToAsk === "complement")
         .map((f) => f.key),
@@ -457,10 +469,35 @@ export function BehaviorEditor() {
   // ── Flow helpers ──────────────────────────────────────────────────────────
 
   function setFieldWhen(key: string, whenToAsk: WhenToAsk) {
-    setConfig((prev) => ({
-      ...prev,
-      fieldsConfig: { ...prev.fieldsConfig, [key]: { ...prev.fieldsConfig[key], whenToAsk } },
-    }));
+    setConfig((prev) => {
+      const wasChecking = prev.fieldsConfig[key]?.whenToAsk === "checking";
+      const nowChecking = whenToAsk === "checking";
+      let newOrder = prev.checkingOrder;
+      if (!wasChecking && nowChecking) {
+        // Append to end of checking order
+        newOrder = [...prev.checkingOrder, key];
+      } else if (wasChecking && !nowChecking) {
+        // Remove from checking order
+        newOrder = prev.checkingOrder.filter((k) => k !== key);
+      }
+      return {
+        ...prev,
+        fieldsConfig: { ...prev.fieldsConfig, [key]: { ...prev.fieldsConfig[key], whenToAsk } },
+        checkingOrder: newOrder,
+      };
+    });
+  }
+
+  function moveChecking(key: string, direction: "up" | "down") {
+    setConfig((prev) => {
+      const arr = [...prev.checkingOrder];
+      const idx = arr.indexOf(key);
+      if (idx === -1) return prev;
+      const target = direction === "up" ? idx - 1 : idx + 1;
+      if (target < 0 || target >= arr.length) return prev;
+      [arr[idx], arr[target]] = [arr[target], arr[idx]];
+      return { ...prev, checkingOrder: arr };
+    });
   }
 
   function setFieldMode(key: string, mode: ScriptedMode) {
@@ -868,31 +905,92 @@ export function BehaviorEditor() {
         title="Fluxo e Abordagem"
         description="Quais informações pedir em cada etapa e como a Lorena aborda cada uma"
       >
-        {/* Fixed fields — always required, no dropdown */}
+        {/* Antes de verificar agenda — ordered list with reorder controls */}
         <div className="flex flex-col gap-1">
-          <FieldLabel>Campos obrigatórios (fixos)</FieldLabel>
-          {["Nome completo", "Unidade"].map((label) => (
-            <div key={label} className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5">
-              <span className="flex-1 text-sm font-medium text-foreground">{label}</span>
-              <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] text-muted-foreground">Antes de verificar agenda · sempre</span>
-            </div>
-          ))}
+          <FieldLabel>Antes de verificar agenda</FieldLabel>
+          <p className="text-[11px] text-muted-foreground mb-1">
+            A Lorena pergunta esses dados nesta ordem antes de buscar horários disponíveis. Use as setas para reordenar.
+          </p>
+          {config.checkingOrder.map((key, idx) => {
+            const isFixed = CHECKING_ALWAYS.includes(key);
+            const fieldDef = CONFIGURABLE_FIELDS.find((f) => f.key === key);
+            const label = isFixed ? CHECKING_ALWAYS_LABELS[key] : (fieldDef?.label ?? key);
+            const fc = isFixed ? null : (config.fieldsConfig[key] ?? { whenToAsk: "checking", mode: "auto", fixedText: "", guidedText: "" });
+            const isFirst = idx === 0;
+            const isLast = idx === config.checkingOrder.length - 1;
+            return (
+              <div key={key} className="rounded-lg border border-border bg-white p-3 flex flex-col gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Reorder buttons */}
+                  <div className="flex flex-col gap-0.5 shrink-0">
+                    <button
+                      onClick={() => moveChecking(key, "up")}
+                      disabled={isFirst}
+                      className="rounded p-0.5 text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="Mover para cima"
+                    >
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => moveChecking(key, "down")}
+                      disabled={isLast}
+                      className="rounded p-0.5 text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="Mover para baixo"
+                    >
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <span className="text-sm font-medium text-foreground w-36 shrink-0">{label}</span>
+                  {isFixed ? (
+                    <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] text-muted-foreground">sempre obrigatório</span>
+                  ) : (
+                    <>
+                      <select
+                        value="checking"
+                        onChange={(e) => setFieldWhen(key, e.target.value as WhenToAsk)}
+                        className="rounded-md border border-border bg-white px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                      >
+                        {WHEN_OPTIONS
+                          .filter((o) => o.value !== "novoOnly" || NOVO_ONLY_ELIGIBLE.has(key))
+                          .map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                      </select>
+                      {fc && (
+                        <div className="ml-auto">
+                          <ModeSelector mode={fc.mode} onMode={(m) => setFieldMode(key, m)} />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+                {fc && (
+                  <ModeTextareas
+                    mode={fc.mode}
+                    fixedText={fc.fixedText}
+                    guidedText={fc.guidedText}
+                    onFixedText={(t) => setFieldText(key, "fixedText", t)}
+                    onGuidedText={(t) => setFieldText(key, "guidedText", t)}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <hr className="border-border" />
 
-        {/* Configurable fields — one row per field */}
+        {/* Configurable fields not in checking — other groups */}
         <div className="flex flex-col gap-1">
-          <FieldLabel>Campos configuráveis</FieldLabel>
+          <FieldLabel>Outros campos</FieldLabel>
           <p className="text-[11px] text-muted-foreground mb-1">Escolha quando cada campo é perguntado e como a Lorena o aborda.</p>
-          {CONFIGURABLE_FIELDS.map(({ key, label }) => {
+          {CONFIGURABLE_FIELDS.filter(({ key }) => config.fieldsConfig[key]?.whenToAsk !== "checking").map(({ key, label }) => {
             const fc = config.fieldsConfig[key] ?? { whenToAsk: "never", mode: "auto", fixedText: "", guidedText: "" };
             const isActive = fc.whenToAsk !== "never";
             return (
               <div key={key} className={cn("rounded-lg border p-3 flex flex-col gap-2", isActive ? "border-border bg-white" : "border-border/50 bg-muted/20")}>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium text-foreground w-36 shrink-0">{label}</span>
-                  {/* When to ask dropdown */}
                   <select
                     value={fc.whenToAsk}
                     onChange={(e) => setFieldWhen(key, e.target.value as WhenToAsk)}
@@ -904,7 +1002,6 @@ export function BehaviorEditor() {
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                   </select>
-                  {/* Mode selector — only when active */}
                   {isActive && (
                     <div className="ml-auto">
                       <ModeSelector mode={fc.mode} onMode={(m) => setFieldMode(key, m)} />
